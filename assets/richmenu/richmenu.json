@@ -1,10 +1,32 @@
 {
-  "size": {
-    "width": 2500,
-    "height": 1686
-  },
-  "selected": false,
-  "name": "inventory-menu",
+  "size": { "width": 2500, "height": 1686 },
+  "selected": true,
+  "name": "inventory-menu-v1",
   "chatBarText": "在庫メニュー",
-  "areas": []
+  "areas": [
+    {
+      "bounds": { "x": 0, "y": 0, "width": 833, "height": 843 },
+      "action": { "type": "postback", "data": "action=list", "displayText": "在庫一覧" }
+    },
+    {
+      "bounds": { "x": 833, "y": 0, "width": 833, "height": 843 },
+      "action": { "type": "postback", "data": "action=shortage", "displayText": "不足一覧" }
+    },
+    {
+      "bounds": { "x": 1666, "y": 0, "width": 834, "height": 843 },
+      "action": { "type": "postback", "data": "action=out&step=start", "displayText": "なくなった" }
+    },
+    {
+      "bounds": { "x": 0, "y": 843, "width": 833, "height": 843 },
+      "action": { "type": "postback", "data": "action=buy&step=start", "displayText": "買った" }
+    },
+    {
+      "bounds": { "x": 833, "y": 843, "width": 833, "height": 843 },
+      "action": { "type": "postback", "data": "action=new&step=start", "displayText": "新規登録" }
+    },
+    {
+      "bounds": { "x": 1666, "y": 843, "width": 834, "height": 843 },
+      "action": { "type": "postback", "data": "action=help", "displayText": "ヘルプ" }
+    }
+  ]
 }
