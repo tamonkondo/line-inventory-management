@@ -67,6 +67,7 @@ export const FlexBuilder = {
   - 状態(✅/❌)
   - カテゴリ(あれば)
   - 購入先: `stores.join(' / ')`(あれば)
+  - メモ(あれば。Notion側で記入された自由テキスト: R-10)
   - 最終購入日(あれば「最終購入: YYYY-MM-DD」)
   - purchases が渡されたら「最近の購入」として日付を最大3行
 - footer ボタン:
@@ -127,9 +128,9 @@ export const FlexBuilder = {
 export const test_flex = (): void => {
   const items: InventoryItem[] = [
     { pageId: 'a', name: '食器用洗剤', inStock: true, category: '洗剤', photoUrl: null,
-      stores: ['スーパー'], lastPurchasedAt: '2026-07-01' },
+      stores: ['スーパー'], memo: null, lastPurchasedAt: '2026-07-01' },
     { pageId: 'b', name: '米', inStock: false, category: '食品', photoUrl: null,
-      stores: [], lastPurchasedAt: null },
+      stores: [], memo: null, lastPurchasedAt: null },
   ];
   LineClient.push('U自分のuserId', [FlexBuilder.buildItemListMessage('在庫一覧', items)]);
   LineClient.push('U自分のuserId', [FlexBuilder.buildItemCard(items[0])]);

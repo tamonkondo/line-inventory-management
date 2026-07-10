@@ -66,6 +66,7 @@ export const NotionMapper = {
       category: propSelect(page, P.CATEGORY),
       photoUrl: propFilesFirstUrl(page, P.PHOTO),
       stores: propMultiSelect(page, P.STORES),
+      memo: propRichText(page, P.MEMO) || null,
       lastPurchasedAt: propRollupDate(page, P.LAST_PURCHASED),
     };
   },

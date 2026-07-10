@@ -24,7 +24,7 @@ const imageEvent: LineWebhookEvent = {
 
 const item: InventoryItem = {
   pageId: 'page-1', name: 'ラップ', inStock: true, category: null, photoUrl: null,
-  stores: [], lastPurchasedAt: null,
+  stores: [], memo: null, lastPurchasedAt: null,
 };
 
 const lastReplyText = (): string => {

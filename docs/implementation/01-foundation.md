@@ -141,6 +141,7 @@ export const NOTION_PROPS = {
     CATEGORY: 'カテゴリ',         // Select
     PHOTO: '写真',                // Files & media
     STORES: '購入先',             // Multi-select
+    MEMO: 'メモ',                 // Rich text
     LAST_PURCHASED: '最終購入日', // Rollup(date)
     PURCHASES: '購入履歴',        // Relation → PurchaseHistory
     UPDATED_BY: '更新者',         // Relation → Users

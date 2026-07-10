@@ -21,6 +21,7 @@ DB 作成後に、実際のデータベースID・プロパティ名をここに
 | カテゴリ（Category） | Select | 品目分類。洗剤 / 食品 / 日用品 など |
 | 写真（Photo） | Files & media | 商品写真。LINEから登録（v1.1） |
 | 購入先（Stores） | Multi-select | 購入先カテゴリー。複数可（v1.1） |
+| メモ（Memo） | Rich text | 自由記入。Notion画面で編集し、LINEの品目カードに表示（R-10） |
 | 最終購入日（LastPurchasedAt） | Rollup → 購入履歴.購入日 の最大値 | Rollup制約が問題になれば Date ＋ GAS更新に変更（v1.1） |
 | 購入履歴（Purchases） | Relation → PurchaseHistory | 双方向Relation（v1.1） |
 | 最終更新日（UpdatedAt） | Last edited time | 自動 |

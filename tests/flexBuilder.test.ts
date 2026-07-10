@@ -4,7 +4,7 @@ import type { InventoryItem, Purchase } from '../src/types';
 
 const item = (overrides: Partial<InventoryItem> = {}): InventoryItem => ({
   pageId: 'page-1', name: '食器用洗剤', inStock: true, category: '洗剤',
-  photoUrl: null, stores: ['スーパー'],
+  photoUrl: null, stores: ['スーパー'], memo: null,
   lastPurchasedAt: '2026-07-01', ...overrides,
 });
 
@@ -81,6 +81,16 @@ describe('buildItemCard', () => {
     if (withPhoto.type !== 'flex' || withBadPhoto.type !== 'flex') return;
     expect((withPhoto.contents as FlexNode).hero).toBeDefined();
     expect((withBadPhoto.contents as FlexNode).hero).toBeUndefined();
+  });
+
+  it('メモがあればカードに表示し、なければ行を出さない', () => {
+    const withMemo = FlexBuilder.buildItemCard(item({ memo: '詰め替え用を買う' }));
+    const withoutMemo = FlexBuilder.buildItemCard(item({ memo: null }));
+    if (withMemo.type !== 'flex' || withoutMemo.type !== 'flex') return;
+    const texts = (m: typeof withMemo) =>
+      flatten(m.contents).map((n) => n.text).filter((t): t is string => typeof t === 'string');
+    expect(texts(withMemo)).toContain('詰め替え用を買う');
+    expect(texts(withoutMemo)).not.toContain('メモ');
   });
 
   it('購入履歴を最大3件表示する', () => {

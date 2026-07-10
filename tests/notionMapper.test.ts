@@ -12,6 +12,7 @@ describe('NotionMapper.toInventoryItem', () => {
         'カテゴリ': { type: 'select', select: { name: '洗剤' } },
         '写真': { type: 'files', files: [{ type: 'file', name: 'p.jpg', file: { url: 'https://img/signed' } }] },
         '購入先': { type: 'multi_select', multi_select: [{ name: 'スーパー' }, { name: 'Amazon' }] },
+        'メモ': { type: 'rich_text', rich_text: [{ plain_text: '詰め替え用を買う' }] },
         '最終購入日': { type: 'rollup', rollup: { type: 'date', date: { start: '2026-07-01T00:00:00.000+09:00' } } },
       },
     };
@@ -22,6 +23,7 @@ describe('NotionMapper.toInventoryItem', () => {
       category: '洗剤',
       photoUrl: 'https://img/signed',
       stores: ['スーパー', 'Amazon'],
+      memo: '詰め替え用を買う',
       lastPurchasedAt: '2026-07-01',
     });
   });
@@ -35,6 +37,7 @@ describe('NotionMapper.toInventoryItem', () => {
       category: null,
       photoUrl: null,
       stores: [],
+      memo: null,
       lastPurchasedAt: null,
     });
   });

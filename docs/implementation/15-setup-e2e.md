@@ -7,7 +7,7 @@
 
 1. Notion Integrationを作成し、**Internal Integration Token** を控える。
 2. `docs/notion-schema.md` の通りに3つのDBを作成する:
-   - 在庫DB(Inventory): 品名(Title)/在庫あり(Checkbox)/カテゴリ(Select)/写真(Files & media)/購入先(Multi-select)/購入履歴(Relation→購入履歴DB)/最終購入日(Rollup: 購入履歴→購入日→Latest date もしくは Max)/更新者(Relation→ユーザーDB)
+   - 在庫DB(Inventory): 品名(Title)/在庫あり(Checkbox)/カテゴリ(Select)/写真(Files & media)/購入先(Multi-select)/メモ(Text)/購入履歴(Relation→購入履歴DB)/最終購入日(Rollup: 購入履歴→購入日→Latest date もしくは Max)/更新者(Relation→ユーザーDB)
    - ユーザーDB(Users): 表示名(Title)/LINE User ID(Text)/ステータス(Select: 有効・無効)/登録日(Date)
    - 購入履歴DB(PurchaseHistory): 名前(Title)/対象品目(Relation→在庫DB)/購入日(Date)/購入先(Select)/記録者(Relation→ユーザーDB)
 3. **3つのDBすべてをIntegrationに共有**(Connections に追加)する。忘れると404になる。

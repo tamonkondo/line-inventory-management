@@ -129,6 +129,7 @@ export const FlexBuilder = {
     });
     if (item.category) bodyContents.push(infoRow('カテゴリ', item.category));
     if (item.stores.length > 0) bodyContents.push(infoRow('購入先', item.stores.join(' / ')));
+    if (item.memo) bodyContents.push(infoRow('メモ', item.memo));
     if (item.lastPurchasedAt) bodyContents.push(infoRow('最終購入', item.lastPurchasedAt));
     if (purchases && purchases.length > 0) {
       bodyContents.push({ type: 'text', text: '最近の購入', size: 'sm', color: '#999999', margin: 'md' });
