@@ -1,7 +1,7 @@
 # 実装書(12): Flexメッセージ組み立て
 
-- **依存**: 05(ドメイン型のみ。API呼び出しはしない)
-- **対象ファイル**: `src/messages/flexBuilder.js`(実装)
+- **依存**: 01(型のみ。API呼び出しはしない)
+- **対象ファイル**: `src/messages/flexBuilder.ts`(新規)。旧 `.js` を削除
 
 ## 目的
 
@@ -9,22 +9,24 @@
 
 ## 1. 公開メソッド
 
-```js
-var FlexBuilder = {
-  /** 一覧(在庫一覧/不足一覧/検索結果) → Flexメッセージ1件 */
-  buildItemListMessage: function (title, items) { ... },
-  /** 品目選択リスト(なくなった/買った用) → Flexメッセージ1件 */
-  buildPickListMessage: function (items, action) { ... }, // action: 'out'|'buy'
-  /** 品目詳細カード */
-  buildItemCard: function (item, purchases) { ... },      // purchases省略可
+```ts
+import type { InventoryItem, LineMessage, Purchase } from '../types';
+
+export const FlexBuilder = {
+  /** 一覧(在庫一覧/不足一覧/検索結果) */
+  buildItemListMessage(title: string, items: InventoryItem[]): LineMessage { ... },
+  /** 品目選択リスト(なくなった/買った用) */
+  buildPickListMessage(items: InventoryItem[], action: 'out' | 'buy'): LineMessage { ... },
+  /** 品目詳細カード(purchasesは省略可) */
+  buildItemCard(item: InventoryItem, purchases?: Purchase[]): LineMessage { ... },
   /** 編集メニュー(名前/購入先/写真) */
-  buildEditMenuMessage: function (item) { ... },
+  buildEditMenuMessage(item: InventoryItem): LineMessage { ... },
   /** ヘルプ */
-  buildHelpMessage: function () { ... }
+  buildHelpMessage(): LineMessage { ... },
 };
 ```
 
-すべて **LINEメッセージオブジェクト1個**(`{type:'flex', altText, contents}` または `{type:'text', text}`)を返す。呼び出し側が配列に包む。
+すべて **LINEメッセージオブジェクト1個**(`{ type: 'flex', altText, contents }` または `{ type: 'text', text }`)を返す。呼び出し側が配列に包む。
 
 ## 2. 共通ルール
 
@@ -32,6 +34,7 @@ var FlexBuilder = {
 - **在庫状態の表現**: 在庫あり=「✅ あり」(色 `#06C755`)、在庫切れ=「❌ 切れ」(色 `#E63946`)。
 - 写真: `item.photoUrl` があればサムネイル(bubbleの `hero` または行内 `image`)に使う。**httpsのURLのみ許可**(そうでなければ画像なしレイアウトへフォールバック)。
 - Flexの制限: カルーセルは最大12バブル、バブル内ボタンは節度を持って(1バブル最大3ボタン程度)。
+- Flex JSONの `contents` は `Record<string, unknown>` として組み立てる(LINE公式の完全な型定義は導入しない。ネスト構造はローカルの組み立て関数で担保)。
 - 文言・レイアウトの微調整は実装者の裁量でよいが、含める情報(下記)は守る。
 
 ## 3. 各メッセージの内容仕様
@@ -50,7 +53,7 @@ var FlexBuilder = {
 ### 3.2 `buildPickListMessage(items, action)`
 
 - 目的: 「どれが なくなった/買った ?」を1タップで選ばせる。
-- 各行: 品名+右端に選択ボタン(またはリスト行タップ)→ `action=<action>&step=pick&id=<pageId>`。
+- 各行: 品名+行タップで `action=<action>&step=pick&id=<pageId>`。
 - `displayText` を設定し、タップ時にトークへ「なくなった: 食器用洗剤」等が発言として残るようにする。
 - 最大20行、超過分はフッタ案内(3.1と同じ)。
 - 末尾に「キャンセル」ボタン(`action=cancel`)。
@@ -103,9 +106,9 @@ var FlexBuilder = {
 
 ## 4. 実装上の注意
 
-- Flex JSONの組み立ては、行生成(`itemRow_(item)`)・ボタン生成(`postbackButton_(label, data, displayText)`)などのプライベート関数に分解し、重複を避ける。
+- Flex JSONの組み立ては、行生成(`itemRow(item)`)・ボタン生成(`postbackButton(label, data, displayText?)`)などの非export関数に分解し、重複を避ける。
 - postback data の文字列は実装書11の表と**完全一致**させる(スペルミスに注意)。
-- pageId等を `encodeURIComponent` してdataに入れる。
+- pageId等は `encodeURIComponent` してdataに入れる。
 
 ## 5. 受け入れ基準
 
@@ -113,21 +116,22 @@ var FlexBuilder = {
 - [ ] altTextが全Flexに設定されている。
 - [ ] photoUrlなし・カテゴリなし・購入先なしの品目でも表示できる(nullで例外にならない)。
 - [ ] 21件以上で20件+「ほかN件」になる。
-- [ ] このファイルから NotionClient / LineClient / 各Service を呼んでいない。
+- [ ] このファイルから NotionClient / LineClient / 各Service をimportしていない。
+- [ ] `npm run typecheck` が通る。
 
 ## 6. 動作確認方法
 
 ダミーデータで組み立て、実機に送って表示確認:
 
-```js
-function test_flex() {
-  var items = [
+```ts
+export const test_flex = (): void => {
+  const items: InventoryItem[] = [
     { pageId: 'a', name: '食器用洗剤', inStock: true, category: '洗剤', photoUrl: null,
       stores: ['スーパー'], location: null, expiryDate: null, lastPurchasedAt: '2026-07-01' },
     { pageId: 'b', name: '米', inStock: false, category: '食品', photoUrl: null,
-      stores: [], location: null, expiryDate: null, lastPurchasedAt: null }
+      stores: [], location: null, expiryDate: null, lastPurchasedAt: null },
   ];
   LineClient.push('U自分のuserId', [FlexBuilder.buildItemListMessage('在庫一覧', items)]);
   LineClient.push('U自分のuserId', [FlexBuilder.buildItemCard(items[0])]);
-}
+};
 ```

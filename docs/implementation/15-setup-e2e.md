@@ -12,14 +12,14 @@
    - 購入履歴DB(PurchaseHistory): 名前(Title)/対象品目(Relation→在庫DB)/購入日(Date)/購入先(Select)/記録者(Relation→ユーザーDB)
 3. **3つのDBすべてをIntegrationに共有**(Connections に追加)する。忘れると404になる。
 4. 各DBのIDをURLから控える(`notion.so/<workspace>/<DB_ID>?v=...` の32桁)。
-5. **プロパティ名がコードの `NOTION_PROPS` と完全一致していることを確認**(全角/半角・スペースに注意)。
+5. **プロパティ名がコードの `NOTION_PROPS`(`src/config.ts`)と完全一致していることを確認**(全角/半角・スペースに注意)。
 6. 在庫DBにテストデータを2〜3件入れる。
 7. `docs/notion-schema.md` の「確定後に記載する項目」にDB IDを記入する。
 
 ### 検証ポイント(未確定事項の解消)
 
 - [ ] **Rollup検証**: 購入履歴DBに手で1件作り、在庫DBの「最終購入日」に日付が出るか。出ない場合は要件11.5#1の代替案(在庫DBにDateプロパティ+GAS更新)へ切り替え、`notion-schema.md` と実装書08を更新する。
-- [ ] **File Upload API検証**: 実装書04の `test_notionUpload()` を実行。`Notion-Version: 2022-06-28` で `/file_uploads` が動くか確認。エラーになる場合はそのリクエストのみバージョンを上げる(実装書04 §3参照)。
+- [ ] **File Upload API検証**: 実装書04の `test_notionUpload` を実行。`Notion-Version: 2022-06-28` で `/file_uploads` が動くか確認。エラーになる場合はそのリクエストのみバージョンを上げる(実装書04 §4参照)。
 
 ## 2. LINE側セットアップ
 
@@ -27,12 +27,20 @@
 2. **チャネルアクセストークン(長期)** と **チャネルシークレット** を控える。
 3. 応答設定: あいさつメッセージOFF・応答メッセージOFF・Webhook ON。
 
-## 3. GASデプロイ
+## 3. ローカル環境と .env
+
+1. `cp .env.example .env` を実行し、控えた実値を記入する(**.envはコミットしない**。gitignore済み)。
+2. `.env` はローカルの控え兼セットアップ作業のチェックリストとして使う。**GASの実行時に読まれるのはスクリプトプロパティ**(§4-4で同じキー名で登録する)。
+
+## 4. GASデプロイ
 
 1. `npm install` → `npx clasp login`。
-2. GASプロジェクトを作成し `.clasp.json` に `scriptId` を設定(`.clasp.json` はgit管理外)。
-3. `npm run push` でソース反映。
-4. スクリプトプロパティを設定:
+2. GASプロジェクトを作成し、`.clasp.json` を作る(git管理外):
+   ```json
+   { "scriptId": "<.envのCLASP_SCRIPT_IDの値>", "rootDir": "dist" }
+   ```
+3. `npm run typecheck` → `npm run push`(esbuildビルド+clasp push)でソース反映。
+4. スクリプトプロパティを設定(`.env` と同じキー名・値):
 
 | キー | 値 |
 | --- | --- |
@@ -44,13 +52,15 @@
 | `NOTION_PURCHASES_DB_ID` | 購入履歴DBのID |
 | `RICHMENU_IMAGE_FILE_ID` | リッチメニュー画像のDriveファイルID |
 
+(`CLASP_SCRIPT_ID` は `.clasp.json` 用なのでスクリプトプロパティには不要)
+
 5. 「デプロイ」→「ウェブアプリ」: 実行ユーザー=自分 / アクセス=全員(匿名)。URLを控える。
 6. LINE DevelopersのWebhook URLに設定し「検証」ボタンで疎通確認 → 200。
 7. `setupRichMenu()` を実行(実装書14)。
 
-> 注意: コード更新後は `clasp push` だけでなく、**デプロイの更新**(同じデプロイIDの新バージョン発行)が必要。URLが変わらないよう「デプロイを管理」から編集すること。
+> 注意: コード更新後は `npm run push` だけでなく、**デプロイの更新**(同じデプロイIDの新バージョン発行)が必要。URLが変わらないよう「デプロイを管理」から編集すること。
 
-## 4. E2Eチェックリスト
+## 5. E2Eチェックリスト
 
 前提: LINEアカウント2つ(A=自分、B=家族)でBotを友だち追加済み。
 
@@ -77,6 +87,7 @@
 | 19 | 5分放置したセッション(新規登録の品名待ち)にテキスト送信 | 通常コマンドとして処理される(セッション失効) |
 | 20 | スタンプを送る | 無反応(エラーが出ない) |
 
-## 5. 完了報告
+## 6. 完了報告
 
 - 全チェックが通ったら、この表の結果(パス/フェイル)と発見事項を記録し、`docs/requirements.md` の11.5未確定事項を確定へ更新する。
+- 最終確認: `grep -rn "var " src/` が0件、`npm run typecheck` がクリーンであること。

@@ -1,104 +1,138 @@
 # 実装書(04): Notion API クライアント
 
 - **依存**: 01
-- **対象ファイル**: `src/clients/notionClient.js`(拡張)
+- **対象ファイル**: `src/clients/notionClient.ts`(新規)。旧 `src/clients/notionClient.js` を削除
 
 ## 目的
 
-既存の汎用ラッパー(queryDatabase / createPage / updatePage)に、エラーハンドリング・pagination・ページ取得・**ファイルアップロード**を追加する。DBスキーマへの依存は持たせない。
+Notion APIの汎用ラッパー(query / create / update / retrieve / pagination / **ファイルアップロード**)を実装する。DBスキーマへの依存は持たせない。
 
-## 1. `notionFetch_` の改修
+## 1. 型定義(このファイルで定義してexport)
 
-既存実装はステータスコードを見ずに `JSON.parse` している。以下に改修する。
+Notion APIレスポンスの必要最小限の自前型。プロパティ値の詳細構造はmapper(実装書05)が扱うため、ここでは緩く保つ。
 
-```js
-function notionFetch_(method, path, payload) {
-  var res = UrlFetchApp.fetch('https://api.notion.com/v1' + path, {
-    method: method,
+```ts
+export interface NotionPage {
+  id: string;
+  properties: Record<string, NotionPropertyValue>;
+}
+
+/** プロパティ値(必要な型のみ。判別は type フィールドで行う) */
+export interface NotionPropertyValue {
+  type?: string;
+  title?: Array<{ plain_text?: string; text?: { content: string } }>;
+  rich_text?: Array<{ plain_text?: string }>;
+  checkbox?: boolean;
+  select?: { name: string } | null;
+  multi_select?: Array<{ name: string }>;
+  date?: { start: string } | null;
+  files?: Array<{ type?: string; name?: string; file?: { url: string }; external?: { url: string } }>;
+  relation?: Array<{ id: string }>;
+  rollup?: { type?: string; date?: { start: string } | null };
+}
+
+export interface NotionQueryResponse {
+  results: NotionPage[];
+  has_more: boolean;
+  next_cursor: string | null;
+}
+```
+
+## 2. 共通fetch
+
+```ts
+import { CONFIG } from '../config';
+import { logError } from '../utils/logger';
+
+const NOTION_VERSION = '2022-06-28';
+
+const notionFetch = <T>(method: 'get' | 'post' | 'patch', path: string, payload?: object): T => {
+  const options: GoogleAppsScript.URL_Fetch.URLFetchRequestOptions = {
+    method,
     contentType: 'application/json',
     headers: {
-      'Authorization': 'Bearer ' + CONFIG.NOTION_TOKEN,
-      'Notion-Version': '2022-06-28'
+      Authorization: `Bearer ${CONFIG.NOTION_TOKEN}`,
+      'Notion-Version': NOTION_VERSION,
     },
-    payload: payload ? JSON.stringify(payload) : null,
-    muteHttpExceptions: true
-  });
-  var code = res.getResponseCode();
+    muteHttpExceptions: true,
+    ...(payload ? { payload: JSON.stringify(payload) } : {}),
+  };
+  const url = `https://api.notion.com/v1${path}`;
+  let res = UrlFetchApp.fetch(url, options);
+  let code = res.getResponseCode();
   // レート制限(429)と一時エラー(5xx)は1回だけリトライ
   if (code === 429 || code >= 500) {
     Utilities.sleep(1500);
-    res = UrlFetchApp.fetch('https://api.notion.com/v1' + path, /* 同一options */);
+    res = UrlFetchApp.fetch(url, options);
     code = res.getResponseCode();
   }
   if (code < 200 || code >= 300) {
-    logError('NotionClient', method + ' ' + path + ' → ' + code + ' ' + res.getContentText());
-    throw new Error('Notion API error: ' + code);
+    logError('NotionClient', `${method} ${path} → ${code} ${res.getContentText()}`);
+    throw new Error(`Notion API error: ${code}`);
   }
-  return JSON.parse(res.getContentText());
-}
+  return JSON.parse(res.getContentText()) as T;
+};
 ```
 
-※ リトライで同一optionsを使うため、options組み立てを関数内で変数に括り出すこと。
+## 3. 公開メソッド
 
-## 2. メソッド追加
+```ts
+export const NotionClient = {
+  queryDatabase(databaseId: string, payload: object): NotionQueryResponse {
+    return notionFetch<NotionQueryResponse>('post', `/databases/${databaseId}/query`, payload);
+  },
 
-既存の `queryDatabase` / `createPage` / `updatePage` に加えて:
+  createPage(payload: object): NotionPage {
+    return notionFetch<NotionPage>('post', '/pages', payload);
+  },
 
-```js
-/** ページ1件取得 */
-retrievePage: function (pageId) {
-  return notionFetch_('GET', '/pages/' + pageId, null);
-},
+  updatePage(pageId: string, payload: object): NotionPage {
+    return notionFetch<NotionPage>('patch', `/pages/${pageId}`, payload);
+  },
 
-/** queryDatabaseのpaginationを吸収して全ページ配列を返す */
-queryAll: function (databaseId, payload) {
-  var results = [];
-  var cursor = null;
-  do {
-    var body = payload ? JSON.parse(JSON.stringify(payload)) : {};
-    if (cursor) body.start_cursor = cursor;
-    var res = this.queryDatabase(databaseId, body);
-    results = results.concat(res.results || []);
-    cursor = res.has_more ? res.next_cursor : null;
-  } while (cursor);
-  return results;
-},
-```
+  retrievePage(pageId: string): NotionPage {
+    return notionFetch<NotionPage>('get', `/pages/${pageId}`);
+  },
 
-## 3. ファイルアップロード(Notion File Upload API)
+  /** queryDatabaseのpaginationを吸収して全ページ配列を返す(引数payloadは破壊しない) */
+  queryAll(databaseId: string, payload?: object): NotionPage[] {
+    const results: NotionPage[] = [];
+    let cursor: string | null = null;
+    do {
+      const body: Record<string, unknown> = { ...(payload ?? {}) };
+      if (cursor) body.start_cursor = cursor;
+      const res = this.queryDatabase(databaseId, body);
+      results.push(...res.results);
+      cursor = res.has_more ? res.next_cursor : null;
+    } while (cursor);
+    return results;
+  },
 
-写真登録(実装書13)で使う。2段階:
-
-1. **アップロード枠の作成**: `POST /v1/file_uploads`(JSON)
-   - body: `{ "mode": "single_part", "filename": "<name>.jpg" }`
-   - レスポンス: `{ id, upload_url, ... }`
-2. **バイナリ送信**: `POST /v1/file_uploads/{id}/send`(**multipart/form-data**)
-   - フォームフィールド名 `file` にバイナリを入れる。
-   - GASでは `payload: { file: blob }` を渡すと UrlFetchApp が自動で multipart にする。**`contentType` は指定しない**こと(指定するとmultipartにならない)。
-
-```js
-/** LINE等から取得したBlobをNotionへアップロードし、file_upload IDを返す */
-uploadFile: function (blob, filename) {
-  var created = notionFetch_('POST', '/file_uploads', {
-    mode: 'single_part',
-    filename: filename
-  });
-  var res = UrlFetchApp.fetch('https://api.notion.com/v1/file_uploads/' + created.id + '/send', {
-    method: 'post',
-    headers: {
-      'Authorization': 'Bearer ' + CONFIG.NOTION_TOKEN,
-      'Notion-Version': '2022-06-28'
-    },
-    payload: { file: blob.setName(filename) },
-    muteHttpExceptions: true
-  });
-  var code = res.getResponseCode();
-  if (code < 200 || code >= 300) {
-    logError('NotionClient.uploadFile', code + ' ' + res.getContentText());
-    throw new Error('Notion file upload failed: ' + code);
-  }
-  return created.id;
-}
+  /** LINE等から取得したBlobをNotionへアップロードし、file_upload IDを返す */
+  uploadFile(blob: GoogleAppsScript.Base.Blob, filename: string): string {
+    // 1) アップロード枠の作成
+    const created = notionFetch<{ id: string }>('post', '/file_uploads', {
+      mode: 'single_part',
+      filename,
+    });
+    // 2) バイナリ送信(multipart/form-data)。contentTypeを指定しないこと(指定するとmultipartにならない)
+    const res = UrlFetchApp.fetch(`https://api.notion.com/v1/file_uploads/${created.id}/send`, {
+      method: 'post',
+      headers: {
+        Authorization: `Bearer ${CONFIG.NOTION_TOKEN}`,
+        'Notion-Version': NOTION_VERSION,
+      },
+      payload: { file: blob.setName(filename) },
+      muteHttpExceptions: true,
+    });
+    const code = res.getResponseCode();
+    if (code < 200 || code >= 300) {
+      logError('NotionClient.uploadFile', `${code} ${res.getContentText()}`);
+      throw new Error(`Notion file upload failed: ${code}`);
+    }
+    return created.id;
+  },
+};
 ```
 
 アップロードしたファイルをページのFilesプロパティに添付する形式(参照用。添付処理自体はInventoryService側):
@@ -109,29 +143,33 @@ uploadFile: function (blob, filename) {
 ] } } }
 ```
 
-- single_part の上限は20MB。超えたら例外でよい(呼び出し側がユーザーに謝るメッセージを返す)。
-- `file_uploads` エンドポイントが `Notion-Version: 2022-06-28` で弾かれる場合は、このリクエストに限りヘッダを新しい版(例: `2025-09-03`)へ上げる。**先に実挙動を確認してから決めること**(実装書15のセットアップ時に検証)。
+## 4. 注意点
 
-## 4. 受け入れ基準
+- single_part の上限は20MB。超えたら例外でよい(呼び出し側がユーザーに謝るメッセージを返す)。
+- `/file_uploads` エンドポイントが `Notion-Version: 2022-06-28` で弾かれる場合は、**このリクエストに限り**ヘッダを新しい版(例: `2025-09-03`)へ上げる。先に実挙動を確認してから決めること(実装書15のセットアップ時に検証)。
+- GASでは `payload` にBlobを含むオブジェクトを渡すと UrlFetchApp が自動で multipart/form-data にする。
+
+## 5. 受け入れ基準
 
 - [ ] 2xx以外で `logError` + 例外。429/5xxで1回リトライする。
-- [ ] `retrievePage` / `queryAll` / `uploadFile` が追加されている。
-- [ ] `queryAll` が `has_more` / `next_cursor` を正しく辿る(引数payloadを破壊しない)。
-- [ ] `uploadFile` の `/send` リクエストで contentType を明示指定していない(multipartになる)。
-- [ ] トークンがログに出ない。
+- [ ] `NotionPage` / `NotionQueryResponse` / `NotionPropertyValue` がexportされている。
+- [ ] `queryAll` が `has_more` / `next_cursor` を正しく辿り、引数payloadを破壊しない。
+- [ ] `uploadFile` の `/send` リクエストで contentType を明示指定していない。
+- [ ] トークンがログに出ない。`npm run typecheck` が通る。
 
-## 5. 動作確認方法
+## 6. 動作確認方法
 
 スクリプトプロパティ設定+Notion DB作成後(実装書15):
 
-```js
-function test_notionQuery() {
-  var pages = NotionClient.queryAll(CONFIG.NOTION_INVENTORY_DB_ID, {});
-  logInfo('test', 'pages=' + pages.length);
-}
-function test_notionUpload() {
-  var blob = Utilities.newBlob('hello', 'text/plain', 'hello.txt');
-  var id = NotionClient.uploadFile(blob, 'hello.txt');
-  logInfo('test', 'fileUploadId=' + id);
-}
+```ts
+export const test_notionQuery = (): void => {
+  const pages = NotionClient.queryAll(CONFIG.NOTION_INVENTORY_DB_ID);
+  logInfo('test', `pages=${pages.length}`);
+};
+
+export const test_notionUpload = (): void => {
+  const blob = Utilities.newBlob('hello', 'text/plain', 'hello.txt');
+  const id = NotionClient.uploadFile(blob, 'hello.txt');
+  logInfo('test', `fileUploadId=${id}`);
+};
 ```

@@ -1,7 +1,7 @@
 # 実装書(13): 写真登録フロー — LINE画像 → Notion
 
 - **依存**: 03, 04, 07, 11
-- **対象ファイル**: `src/handlers/imageHandler.js`(**新規作成**)
+- **対象ファイル**: `src/handlers/imageHandler.ts`(**新規作成**)
 
 ## 目的
 
@@ -23,46 +23,60 @@
            reply: 「写真を登録するには「編集 品名」→「写真を変える」から操作してください」
 ```
 
-## 2. `src/handlers/imageHandler.js` の実装
+## 2. `src/handlers/imageHandler.ts` の実装
 
-```js
+```ts
+import { LineClient } from '../clients/lineClient';
+import { NotionClient } from '../clients/notionClient';
+import { InventoryService } from '../services/inventoryService';
+import { SessionStore } from '../utils/sessionStore';
+import { logError } from '../utils/logger';
+import type { LineWebhookEvent } from '../types';
+
+/** ContentTypeから拡張子を決めてファイル名を作る(非export) */
+const buildPhotoFilename = (blob: GoogleAppsScript.Base.Blob): string => {
+  const contentType = (blob.getContentType() ?? '').toLowerCase();
+  const ext = contentType.includes('png') ? 'png' : 'jpg'; // LINEの画像は基本jpeg
+  const stamp = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyyMMdd-HHmmss');
+  return `photo-${stamp}.${ext}`;
+};
+
 /** 画像メッセージを処理する(写真登録フロー: F-19)。 */
-function handleImageMessage(event) {
-  var userId = event.source.userId;
-  var session = SessionStore.get(userId);
+export const handleImageMessage = (event: LineWebhookEvent): void => {
+  const userId = event.source.userId;
+  if (!userId || !event.replyToken || !event.message) return;
 
-  if (!session || session.flow !== 'attach_photo') {
-    LineClient.reply(event.replyToken, [{ type: 'text',
-      text: '写真を登録するには「編集 品名」→「写真を変える」から操作してください。' }]);
+  const session = SessionStore.get(userId);
+  if (session?.flow !== 'attach_photo') {
+    LineClient.reply(event.replyToken, [{
+      type: 'text',
+      text: '写真を登録するには「編集 品名」→「写真を変える」から操作してください。',
+    }]);
     return;
   }
 
-  var pageId = session.data.pageId;
+  const { pageId } = session.data;
   try {
-    var blob = LineClient.getMessageContent(event.message.id);
-    var filename = buildPhotoFilename_(blob); // 後述
-    var fileUploadId = NotionClient.uploadFile(blob, filename);
+    const blob = LineClient.getMessageContent(event.message.id);
+    const filename = buildPhotoFilename(blob);
+    const fileUploadId = NotionClient.uploadFile(blob, filename);
     InventoryService.attachPhoto(pageId, fileUploadId, filename);
     SessionStore.clear(userId);
 
-    var item = InventoryService.getByPageId(pageId);
-    LineClient.reply(event.replyToken, [{ type: 'text',
-      text: item.name + ' に写真を登録しました 📷' }]);
+    const item = InventoryService.getByPageId(pageId);
+    LineClient.reply(event.replyToken, [{
+      type: 'text',
+      text: `${item?.name ?? '品目'} に写真を登録しました 📷`,
+    }]);
   } catch (err) {
     logError('handleImageMessage', err);
     // セッションは維持(もう一度送れば再試行できる)
-    LineClient.reply(event.replyToken, [{ type: 'text',
-      text: '写真の登録に失敗しました。もう一度送るか、「キャンセル」してください。' }]);
+    LineClient.reply(event.replyToken, [{
+      type: 'text',
+      text: '写真の登録に失敗しました。もう一度送るか、「キャンセル」してください。',
+    }]);
   }
-}
-
-/** ContentTypeから拡張子を決めてファイル名を作る */
-function buildPhotoFilename_(blob) {
-  var ct = (blob.getContentType() || '').toLowerCase();
-  var ext = ct.indexOf('png') >= 0 ? 'png' : 'jpg'; // LINEの画像は基本jpeg
-  var stamp = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyyMMdd-HHmmss');
-  return 'photo-' + stamp + '.' + ext;
-}
+};
 ```
 
 ## 3. 仕様メモ・制約
@@ -80,6 +94,7 @@ function buildPhotoFilename_(blob) {
 - [ ] セッションなしで画像を送ると案内文が返る(例外にならない)。
 - [ ] 失敗時にセッションが残り、画像を再送すれば成功する。
 - [ ] 写真登録後の「在庫」一覧・品目カードにサムネイルが表示される。
+- [ ] `npm run typecheck` が通る。
 
 ## 5. 動作確認方法
 

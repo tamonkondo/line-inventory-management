@@ -1,7 +1,7 @@
 # 実装書(08): 購入履歴サービス
 
 - **依存**: 04, 05, 07
-- **対象ファイル**: `src/services/purchaseService.js`(**新規作成**)
+- **対象ファイル**: `src/services/purchaseService.ts`(**新規作成**)
 
 ## 目的
 
@@ -9,49 +9,43 @@
 
 ## 1. 実装内容
 
-```js
+```ts
+import { CONFIG, NOTION_PROPS } from '../config';
+import { NotionClient } from '../clients/notionClient';
+import { NotionMapper } from '../utils/notionMapper';
+import type { InventoryItem, Purchase } from '../types';
+
+const P = NOTION_PROPS.PURCHASES;
+
 /** 購入履歴の記録・参照(F-17/F-18) */
-var PurchaseService = {
+export const PurchaseService = {
   /**
    * 購入を1件記録する。
-   * @param {InventoryItem} item 対象品目
-   * @param {string|null} userPageId 記録者(UserのpageId)。不明ならnull
+   * @param item 対象品目
+   * @param userPageId 記録者(UserのpageId)。不明ならnull
    */
-  record: function (item, userPageId) {
-    var today = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd');
-    var properties = {};
-    properties[NOTION_PROPS.PURCHASES.NAME] = {
-      title: [{ text: { content: item.name + ' ' + today } }]
-    };
-    properties[NOTION_PROPS.PURCHASES.ITEM] = {
-      relation: [{ id: item.pageId }]
-    };
-    properties[NOTION_PROPS.PURCHASES.PURCHASED_AT] = {
-      date: { start: today }
-    };
-    if (userPageId) {
-      properties[NOTION_PROPS.PURCHASES.RECORDED_BY] = {
-        relation: [{ id: userPageId }]
-      };
-    }
+  record(item: InventoryItem, userPageId: string | null): void {
+    const today = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd');
     NotionClient.createPage({
       parent: { database_id: CONFIG.NOTION_PURCHASES_DB_ID },
-      properties: properties
+      properties: {
+        [P.NAME]: { title: [{ text: { content: `${item.name} ${today}` } }] },
+        [P.ITEM]: { relation: [{ id: item.pageId }] },
+        [P.PURCHASED_AT]: { date: { start: today } },
+        ...(userPageId ? { [P.RECORDED_BY]: { relation: [{ id: userPageId }] } } : {}),
+      },
     });
   },
 
-  /** 品目の直近購入履歴 → Purchase[](購入日降順・最大limit件) */
-  listRecent: function (itemPageId, limit) {
-    var res = NotionClient.queryDatabase(CONFIG.NOTION_PURCHASES_DB_ID, {
-      filter: {
-        property: NOTION_PROPS.PURCHASES.ITEM,
-        relation: { contains: itemPageId }
-      },
-      sorts: [{ property: NOTION_PROPS.PURCHASES.PURCHASED_AT, direction: 'descending' }],
-      page_size: limit || 5
+  /** 品目の直近購入履歴(購入日降順・最大limit件、既定5件) */
+  listRecent(itemPageId: string, limit = 5): Purchase[] {
+    const res = NotionClient.queryDatabase(CONFIG.NOTION_PURCHASES_DB_ID, {
+      filter: { property: P.ITEM, relation: { contains: itemPageId } },
+      sorts: [{ property: P.PURCHASED_AT, direction: 'descending' }],
+      page_size: limit,
     });
-    return (res.results || []).map(NotionMapper.toPurchase);
-  }
+    return res.results.map((page) => NotionMapper.toPurchase(page));
+  },
 };
 ```
 
@@ -68,14 +62,15 @@ var PurchaseService = {
 - [ ] `listRecent` が購入日降順で返り、他品目の履歴が混ざらない。
 - [ ] `userPageId=null` でもエラーにならない(記録者が空になるだけ)。
 - [ ] 在庫DB側の「最終購入日」(Rollup)が record 後に更新されることを目視確認。
+- [ ] `npm run typecheck` が通る。
 
 ## 4. 動作確認方法
 
-```js
-function test_purchase() {
-  var item = InventoryService.findByName('食器用洗剤');
+```ts
+export const test_purchase = (): void => {
+  const item = InventoryService.findByName('食器用洗剤');
+  if (!item) throw new Error('テストデータがありません');
   PurchaseService.record(item, null);
-  var recent = PurchaseService.listRecent(item.pageId, 3);
-  logInfo('test', recent); // 先頭が今日の日付
-}
+  logInfo('test', PurchaseService.listRecent(item.pageId, 3)); // 先頭が今日の日付
+};
 ```

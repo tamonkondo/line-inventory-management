@@ -1,7 +1,7 @@
 # 実装書(14): リッチメニュー — 定義・登録スクリプト
 
 - **依存**: 03
-- **対象ファイル**: `assets/richmenu/richmenu.json`(実装)、`src/setup/richMenuSetup.js`(**新規作成**)
+- **対象ファイル**: `assets/richmenu/richmenu.json`(実装)、`src/setup/richMenuSetup.ts`(**新規作成**。01のプレースホルダを置き換え)
 
 ## 目的
 
@@ -48,59 +48,69 @@
 - `data` の値は実装書11の表と完全一致させること。
 - `selected: true`(メニューを開いた状態で表示)。
 
-## 3. `src/setup/richMenuSetup.js`
+## 3. `src/setup/richMenuSetup.ts`
 
-`.claspignore` の都合で `assets/` はGASに上がらないため、**同じ定義をJSオブジェクトとしてこのファイルにも持つ**(`RICHMENU_DEF` 定数)。`assets/richmenu/richmenu.json` が正で、変更時は両方を同期する旨をコメントに書く。
+TypeScriptなので **`assets/richmenu/richmenu.json` を `import` で取り込める**(esbuildがJSONをバンドルする)。二重管理は不要。
 
-```js
+```ts
+import richMenuDef from '../../assets/richmenu/richmenu.json';
+import { CONFIG } from '../config';
+import { logInfo } from '../utils/logger';
+
+// ※ tsconfig.json に "resolveJsonModule": true を追加すること(このタスクで行う)
+
 /** リッチメニュー登録用ワンショットスクリプト。GASエディタから手動実行する。 */
 
-var RICHMENU_DEF = { /* richmenu.json と同一内容 */ };
-
 /** 1) メニュー作成 → 2) 画像アップロード → 3) デフォルト設定 を一括実行 */
-function setupRichMenu() {
-  var richMenuId = createRichMenu_();
-  uploadRichMenuImage_(richMenuId);
-  setDefaultRichMenu_(richMenuId);
-  logInfo('setupRichMenu', 'done: ' + richMenuId);
-}
+export const setupRichMenu = (): void => {
+  const richMenuId = createRichMenu();
+  uploadRichMenuImage(richMenuId);
+  setDefaultRichMenu(richMenuId);
+  logInfo('setupRichMenu', `done: ${richMenuId}`);
+};
+
+/** 登録済みリッチメニューの一覧をログに出す */
+export const listRichMenus = (): void => { ... };
+
+/** 指定IDのリッチメニューを削除する(GASエディタから実行するため引数なし版も検討) */
+export const deleteRichMenu = (richMenuId: string): void => { ... };
 ```
 
-### 3.1 各ステップのAPI
+> GASエディタからは引数付き関数を直接実行できないため、`deleteRichMenu` は
+> スクリプトプロパティや `listRichMenus` のログからIDをコピーして使う
+> `deleteAllRichMenus()`(全削除)も用意しておくと作り直しが楽。
+
+### 3.1 各ステップのAPI(非export関数として実装)
 
 | ステップ | エンドポイント | 備考 |
 | --- | --- | --- |
-| 作成 | `POST https://api.line.me/v2/bot/richmenu`(JSON=RICHMENU_DEF) | レスポンスの `richMenuId` を使う |
-| 画像 | `POST https://api-data.line.me/v2/bot/richmenu/{richMenuId}/content` | `contentType: 'image/png'`、payloadに画像Blobをそのまま。**ホストがapi-data**な点に注意 |
-| デフォルト設定 | `POST https://api.line.me/v2/bot/user/all/richmenu/{richMenuId}` | 全ユーザーに適用 |
+| 作成 `createRichMenu` | `POST https://api.line.me/v2/bot/richmenu`(JSON=richMenuDef) | レスポンスの `richMenuId` を返す |
+| 画像 `uploadRichMenuImage` | `POST https://api-data.line.me/v2/bot/richmenu/{richMenuId}/content` | `contentType: 'image/png'`、payloadに画像Blobをそのまま。**ホストがapi-data**な点に注意 |
+| デフォルト設定 `setDefaultRichMenu` | `POST https://api.line.me/v2/bot/user/all/richmenu/{richMenuId}` | 全ユーザーに適用 |
+| 一覧 | `GET https://api.line.me/v2/bot/richmenu/list` | |
+| 削除 | `DELETE https://api.line.me/v2/bot/richmenu/{richMenuId}` | |
+
+- 作成・一覧・削除・デフォルト設定は `lineFetch`(実装書03でexport)を再利用する。
+- 画像アップロードだけはcontentTypeが特殊なので個別に `UrlFetchApp.fetch` を書く。
 
 画像の入手: スクリプトプロパティ `RICHMENU_IMAGE_FILE_ID`(Google DriveのファイルID)から
 `DriveApp.getFileById(CONFIG.RICHMENU_IMAGE_FILE_ID).getBlob()` で取得する。
 画像は 2500×1686 のPNG/JPEG(1MB以下)。デザインは §1 の区画に合わせて別途用意する(仮画像でも区画が分かればよい)。
 
-### 3.2 補助関数(掃除用)
+### 3.2 実装上の注意
 
-```js
-/** 登録済みリッチメニューの一覧をログに出す */
-function listRichMenus() { /* GET /v2/bot/richmenu/list */ }
-/** 指定IDのリッチメニューを削除する */
-function deleteRichMenu(richMenuId) { /* DELETE /v2/bot/richmenu/{richMenuId} */ }
-```
-
-作り直しの際は list → delete → setup の順で使う。
-
-### 3.3 実装上の注意
-
-- このファイルのfetchは `lineFetch_`(実装書03)を再利用してよいが、画像アップロードだけはcontentTypeが特殊なので個別に `UrlFetchApp.fetch` を書く。
+- `src/index.ts` の `global` 束縛(実装書01)に `setupRichMenu` / `listRichMenus` / `deleteAllRichMenus` が含まれていることを確認(なければ追加)。
 - `DriveApp` を使うため、初回実行時にGASのスコープ承認ダイアログが出る(手動実行前提なので問題ない)。
 - Webhook処理からは呼ばれない(セットアップ専用)。
 
 ## 4. 受け入れ基準
 
 - [ ] `richmenu.json` の areas が6区画で、dataが実装書11の表と一致。
+- [ ] `richmenu.json` をimportしており、メニュー定義の二重管理がない。
 - [ ] `setupRichMenu()` 一発でメニューが作成され、実機のトーク画面下部に表示される。
 - [ ] 各ボタンをタップすると対応するpostbackが飛ぶ(displayTextがトークに出る)。
-- [ ] `listRichMenus()` / `deleteRichMenu()` で作り直しができる。
+- [ ] `listRichMenus()` / 削除関数で作り直しができる。
+- [ ] `npm run typecheck` / `npm run build` が通る。
 
 ## 5. 動作確認方法
 
