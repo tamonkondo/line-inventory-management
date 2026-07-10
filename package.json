@@ -1,0 +1,14 @@
+{
+  "name": "line-inventory-management",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "login": "clasp login",
+    "push": "clasp push",
+    "pull": "clasp pull",
+    "deploy": "clasp deploy"
+  },
+  "devDependencies": {
+    "@google/clasp": "^3.0.0"
+  }
+}
