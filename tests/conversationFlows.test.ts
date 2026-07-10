@@ -37,7 +37,7 @@ import type { InventoryItem, LineMessage, LineWebhookEvent } from '../src/types'
 
 const item = (overrides: Partial<InventoryItem> = {}): InventoryItem => ({
   pageId: 'page-1', name: '米', inStock: true, category: null, photoUrl: null,
-  stores: [], location: null, expiryDate: null, lastPurchasedAt: null, ...overrides,
+  stores: [], lastPurchasedAt: null, ...overrides,
 });
 
 const postbackEvent = (data: string): LineWebhookEvent =>

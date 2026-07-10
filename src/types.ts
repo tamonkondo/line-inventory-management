@@ -7,8 +7,6 @@ export interface InventoryItem {
   category: string | null;        // カテゴリ(Select名)
   photoUrl: string | null;        // 写真1枚目のURL(なければnull)
   stores: string[];               // 購入先(Multi-select名の配列)
-  location: string | null;        // 保管場所
-  expiryDate: string | null;      // 'YYYY-MM-DD'
   lastPurchasedAt: string | null; // 'YYYY-MM-DD'(Rollup由来)
 }
 

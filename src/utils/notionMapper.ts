@@ -66,8 +66,6 @@ export const NotionMapper = {
       category: propSelect(page, P.CATEGORY),
       photoUrl: propFilesFirstUrl(page, P.PHOTO),
       stores: propMultiSelect(page, P.STORES),
-      location: propSelect(page, P.LOCATION),
-      expiryDate: propDate(page, P.EXPIRY),
       lastPurchasedAt: propRollupDate(page, P.LAST_PURCHASED),
     };
   },

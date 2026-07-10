@@ -23,8 +23,6 @@ DB 作成後に、実際のデータベースID・プロパティ名をここに
 | 購入先（Stores） | Multi-select | 購入先カテゴリー。複数可（v1.1） |
 | 最終購入日（LastPurchasedAt） | Rollup → 購入履歴.購入日 の最大値 | Rollup制約が問題になれば Date ＋ GAS更新に変更（v1.1） |
 | 購入履歴（Purchases） | Relation → PurchaseHistory | 双方向Relation（v1.1） |
-| 保管場所（Location） | Select | 任意 |
-| 賞味期限（ExpiryDate） | Date | 任意。通知は将来拡張 |
 | 最終更新日（UpdatedAt） | Last edited time | 自動 |
 | 更新者（UpdatedBy） | Relation → Users | 任意 |
 
@@ -57,7 +55,7 @@ DB 作成後に、実際のデータベースID・プロパティ名をここに
 「買った」　（LINE） → InStock = ON  ＋ 購入履歴に1レコード追加
 ```
 
-- 品目マスタの編集（カテゴリ・保管場所・選択肢の管理）は **Notion 画面を正** とする（R-05）。
+- 品目マスタの編集（カテゴリ・選択肢の管理）は **Notion 画面を正** とする（R-05）。
 - LINE からは「新規品目登録」「なくなった／買った」「画像・名前・購入先の変更」のみ行う（R-05/R-06）。
 - Notion 画面から InStock を直接切り替えることも可能だが、その場合は通知・購入履歴は発生しない（Webhookを持たないGAS構成のため）。
 

@@ -4,7 +4,7 @@ import type { InventoryItem, Purchase } from '../src/types';
 
 const item = (overrides: Partial<InventoryItem> = {}): InventoryItem => ({
   pageId: 'page-1', name: '食器用洗剤', inStock: true, category: '洗剤',
-  photoUrl: null, stores: ['スーパー'], location: null, expiryDate: null,
+  photoUrl: null, stores: ['スーパー'],
   lastPurchasedAt: '2026-07-01', ...overrides,
 });
 

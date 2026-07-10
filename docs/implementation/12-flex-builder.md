@@ -127,9 +127,9 @@ export const FlexBuilder = {
 export const test_flex = (): void => {
   const items: InventoryItem[] = [
     { pageId: 'a', name: '食器用洗剤', inStock: true, category: '洗剤', photoUrl: null,
-      stores: ['スーパー'], location: null, expiryDate: null, lastPurchasedAt: '2026-07-01' },
+      stores: ['スーパー'], lastPurchasedAt: '2026-07-01' },
     { pageId: 'b', name: '米', inStock: false, category: '食品', photoUrl: null,
-      stores: [], location: null, expiryDate: null, lastPurchasedAt: null },
+      stores: [], lastPurchasedAt: null },
   ];
   LineClient.push('U自分のuserId', [FlexBuilder.buildItemListMessage('在庫一覧', items)]);
   LineClient.push('U自分のuserId', [FlexBuilder.buildItemCard(items[0])]);

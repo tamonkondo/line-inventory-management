@@ -14,7 +14,7 @@ import type { InventoryItem, User } from '../src/types';
 
 const item = (stores: string[] = []): InventoryItem => ({
   pageId: 'item-1', name: 'トイレットペーパー', inStock: false, category: null, photoUrl: null,
-  stores, location: null, expiryDate: null, lastPurchasedAt: null,
+  stores, lastPurchasedAt: null,
 });
 
 const user = (lineUserId: string): User => ({ pageId: `p-${lineUserId}`, name: lineUserId, lineUserId, active: true });

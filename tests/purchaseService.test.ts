@@ -11,7 +11,7 @@ import type { InventoryItem } from '../src/types';
 
 const item: InventoryItem = {
   pageId: 'item-1', name: '米', inStock: false, category: null, photoUrl: null,
-  stores: [], location: null, expiryDate: null, lastPurchasedAt: null,
+  stores: [], lastPurchasedAt: null,
 };
 
 beforeEach(() => {

@@ -66,8 +66,6 @@ return {
   category: propSelect(page, P.CATEGORY),
   photoUrl: propFilesFirstUrl(page, P.PHOTO),
   stores: propMultiSelect(page, P.STORES),
-  location: propSelect(page, P.LOCATION),
-  expiryDate: propDate(page, P.EXPIRY),
   lastPurchasedAt: propRollupDate(page, P.LAST_PURCHASED),
 };
 ```
@@ -135,6 +133,6 @@ export const test_mapper = (): void => {
   };
   logInfo('test', NotionMapper.toInventoryItem(page));
   // → {pageId:'page-id', name:'食器用洗剤', inStock:true, category:'洗剤',
-  //    photoUrl:null, stores:['スーパー','Amazon'], location:null, expiryDate:null, lastPurchasedAt:null}
+  //    photoUrl:null, stores:['スーパー','Amazon'], lastPurchasedAt:null}
 };
 ```

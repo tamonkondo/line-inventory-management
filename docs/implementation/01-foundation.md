@@ -143,8 +143,6 @@ export const NOTION_PROPS = {
     STORES: '購入先',             // Multi-select
     LAST_PURCHASED: '最終購入日', // Rollup(date)
     PURCHASES: '購入履歴',        // Relation → PurchaseHistory
-    LOCATION: '保管場所',         // Select
-    EXPIRY: '賞味期限',           // Date
     UPDATED_BY: '更新者',         // Relation → Users
   },
   USERS: {
