@@ -1,38 +1,26 @@
 import { LineClient } from '../clients/lineClient';
-import { InventoryService } from '../services/inventoryService';
-import { FlexBuilder } from '../messages/flexBuilder';
+import { InventoryService, isDuplicateItemError } from '../services/inventoryService';
+import { textMessage } from '../messages/flexBuilder';
 import { SessionStore } from '../utils/sessionStore';
-import { routeCommand } from '../router/commandRouter';
+import { routeCommand, createNewItemMessages } from '../router/commandRouter';
 import { handleImageMessage } from './imageHandler';
 import type { CommandContext, LineMessage, LineWebhookEvent, SessionState } from '../types';
 
-const text = (body: string): LineMessage => ({ type: 'text', text: body });
+const text = textMessage;
 
 const FALLBACK_MESSAGE = 'コマンドが分かりませんでした。「ヘルプ」と送るか、下のメニューから操作してください。';
-
-const isDuplicateError = (err: unknown): boolean =>
-  err instanceof Error && err.message === 'DUPLICATE_ITEM';
 
 /** セッション継続中のテキスト入力を処理する */
 const handleSessionText = (session: SessionState, input: string, context: CommandContext): LineMessage[] => {
   const value = input.trim();
 
   if (session.flow === 'new' && session.step === 'name') {
-    try {
-      const item = InventoryService.create({ name: value });
-      SessionStore.set(context.lineUserId, { flow: 'attach_photo', step: 'wait', data: { pageId: item.pageId } });
-      return [
-        text(`「${item.name}」を登録しました。`),
-        FlexBuilder.buildItemCard(item),
-        text('続けて写真を送ると登録できます(不要なら「キャンセル」)。'),
-      ];
-    } catch (err) {
-      if (isDuplicateError(err)) {
-        // セッション維持: 別の名前で再入力できる
-        return [text(`「${value}」はすでにあります。別の名前を送るか「キャンセル」してください。`)];
-      }
-      throw err;
+    const messages = createNewItemMessages(value, context);
+    if (messages === 'duplicate') {
+      // セッション維持: 別の名前で再入力できる
+      return [text(`「${value}」はすでにあります。別の名前を送るか「キャンセル」してください。`)];
     }
+    return messages;
   }
 
   if (session.flow === 'edit' && session.step === 'name') {
@@ -41,7 +29,7 @@ const handleSessionText = (session: SessionState, input: string, context: Comman
       SessionStore.clear(context.lineUserId);
       return [text(`名前を「${value}」に変更しました。`)];
     } catch (err) {
-      if (isDuplicateError(err)) {
+      if (isDuplicateItemError(err)) {
         return [text(`「${value}」はすでにあります。別の名前を送るか「キャンセル」してください。`)];
       }
       throw err;

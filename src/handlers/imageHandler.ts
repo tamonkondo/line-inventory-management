@@ -1,6 +1,7 @@
 import { LineClient } from '../clients/lineClient';
 import { NotionClient } from '../clients/notionClient';
 import { InventoryService } from '../services/inventoryService';
+import { textMessage } from '../messages/flexBuilder';
 import { SessionStore } from '../utils/sessionStore';
 import { logError } from '../utils/logger';
 import type { LineWebhookEvent } from '../types';
@@ -23,10 +24,9 @@ export const handleImageMessage = (event: LineWebhookEvent): void => {
 
   const session = SessionStore.get(userId);
   if (session?.flow !== 'attach_photo') {
-    LineClient.reply(event.replyToken, [{
-      type: 'text',
-      text: '写真を登録するには「編集 品名」→「写真を変える」から操作してください。',
-    }]);
+    LineClient.reply(event.replyToken, [
+      textMessage('写真を登録するには「編集 品名」→「写真を変える」から操作してください。'),
+    ]);
     return;
   }
 
@@ -37,19 +37,19 @@ export const handleImageMessage = (event: LineWebhookEvent): void => {
     const filename = buildPhotoFilename(blob);
     const fileUploadId = NotionClient.uploadFile(blob, filename);
     InventoryService.attachPhoto(pageId, fileUploadId, filename);
-    SessionStore.clear(userId);
-
-    const item = InventoryService.getByPageId(pageId);
-    LineClient.reply(event.replyToken, [{
-      type: 'text',
-      text: `${item?.name ?? '品目'} に写真を登録しました 📷`,
-    }]);
   } catch (err) {
     logError('handleImageMessage', err);
     // セッションは維持: もう一度画像を送れば再試行できる
-    LineClient.reply(event.replyToken, [{
-      type: 'text',
-      text: '写真の登録に失敗しました。もう一度送るか、「キャンセル」してください。',
-    }]);
+    LineClient.reply(event.replyToken, [
+      textMessage('写真の登録に失敗しました。もう一度送るか、「キャンセル」してください。'),
+    ]);
+    return;
   }
+
+  // ここから先は登録成功後の後処理: 失敗扱いにしない(「失敗しました」と偽らない)
+  SessionStore.clear(userId);
+  const item = InventoryService.getByPageId(pageId); // 取得失敗はnull(名前なしで続行)
+  LineClient.reply(event.replyToken, [
+    textMessage(`${item?.name ?? '品目'} に写真を登録しました 📷`),
+  ]);
 };

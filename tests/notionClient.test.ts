@@ -38,6 +38,22 @@ describe('NotionClient', () => {
     expect(() => NotionClient.retrievePage('p1')).toThrow('Notion API error: 500');
   });
 
+  it('非冪等なPOSTは5xxでリトライしない(二重書き込み防止)', () => {
+    const { calls } = installUrlFetch([{ code: 502, body: 'gateway' }]);
+    expect(() => NotionClient.createPage({ parent: {} })).toThrow('Notion API error: 502');
+    expect(calls).toHaveLength(1);
+  });
+
+  it('POSTでも429はリトライする(未実行が保証されるため)', () => {
+    const { calls } = installUrlFetch([
+      { code: 429, body: 'rate limited' },
+      { code: 200, body: page('p1') },
+    ]);
+    const res = NotionClient.createPage({ parent: {} });
+    expect(calls).toHaveLength(2);
+    expect(res.id).toBe('p1');
+  });
+
   it('4xxはリトライせず即例外', () => {
     const { calls } = installUrlFetch([{ code: 404, body: 'nf' }]);
     expect(() => NotionClient.retrievePage('p1')).toThrow('Notion API error: 404');

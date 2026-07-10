@@ -23,6 +23,12 @@ export const listRichMenus = (): void => {
   logInfo('listRichMenus', menus.map((menu) => `${menu.richMenuId} (${menu.name})`));
 };
 
+/** 指定IDのリッチメニューを削除する(コードから呼ぶ用。GASエディタからは引数を渡せない) */
+export const deleteRichMenu = (richMenuId: string): void => {
+  lineFetch('delete', `/richmenu/${richMenuId}`);
+  logInfo('deleteRichMenu', `deleted: ${richMenuId}`);
+};
+
 /** 登録済みリッチメニューを全削除する(作り直し用) */
 export const deleteAllRichMenus = (): void => {
   const res = lineFetch<{ richmenus: Array<{ richMenuId: string }> }>('get', '/richmenu/list');

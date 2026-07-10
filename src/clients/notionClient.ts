@@ -42,8 +42,9 @@ const notionFetch = <T>(method: 'get' | 'post' | 'patch', path: string, payload?
   const url = `https://api.notion.com/v1${path}`;
   let res = UrlFetchApp.fetch(url, options);
   let code = res.getResponseCode();
-  // レート制限(429)と一時エラー(5xx)は1回だけリトライ
-  if (code === 429 || code >= 500) {
+  // 429(未実行が保証される)は常に、5xxは冪等なGETのみ1回リトライ。
+  // POST/PATCHの5xxはサーバー側でコミット済みの可能性があり、再送すると二重書き込みになる
+  if (code === 429 || (code >= 500 && method === 'get')) {
     Utilities.sleep(1500);
     res = UrlFetchApp.fetch(url, options);
     code = res.getResponseCode();

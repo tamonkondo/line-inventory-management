@@ -7,6 +7,7 @@ vi.mock('../src/services/inventoryService', () => ({
     getByPageId: vi.fn(), create: vi.fn(), setInStock: vi.fn(),
     updateName: vi.fn(), updateStores: vi.fn(), attachPhoto: vi.fn(),
   },
+  isDuplicateItemError: (err: unknown) => err instanceof Error && err.message === 'DUPLICATE_ITEM',
 }));
 vi.mock('../src/services/purchaseService', () => ({
   PurchaseService: { record: vi.fn(), listRecent: vi.fn() },
@@ -81,29 +82,30 @@ describe('executeOut / なくなった', () => {
     expect((messages[0] as { text: string }).text).toContain('すでに在庫切れ');
   });
 
-  it('「なくなった 品名」で完全一致品目を処理する', () => {
-    vi.mocked(InventoryService.findByName).mockReturnValue(item());
+  it('「なくなった 品名」で完全一致品目を処理する(検索1回のみ)', () => {
+    vi.mocked(InventoryService.search).mockReturnValue([item({ name: '米' }), item({ pageId: 'p2', name: '無洗米' })]);
     routeCommand('なくなった 米', ctx);
     expect(InventoryService.setInStock).toHaveBeenCalledWith('page-1', false);
+    expect(InventoryService.search).toHaveBeenCalledTimes(1);
+    expect(InventoryService.findByName).not.toHaveBeenCalled();
   });
 
   it('見つからない品名は案内テキスト', () => {
-    vi.mocked(InventoryService.findByName).mockReturnValue(null);
     vi.mocked(InventoryService.search).mockReturnValue([]);
     const messages = routeCommand('なくなった 謎の品', ctx);
     expect((messages?.[0] as { text: string }).text).toContain('見つかりません');
   });
 
   it('部分一致1件は自動解決、複数件は選択リスト', () => {
-    vi.mocked(InventoryService.findByName).mockReturnValue(null);
-    vi.mocked(InventoryService.search).mockReturnValue([item()]);
+    vi.mocked(InventoryService.search).mockReturnValue([item({ name: '無洗米' })]);
     routeCommand('なくなった 米', ctx);
     expect(InventoryService.setInStock).toHaveBeenCalled();
 
     vi.clearAllMocks();
-    vi.mocked(InventoryService.findByName).mockReturnValue(null);
-    vi.mocked(InventoryService.search).mockReturnValue([item(), item({ pageId: 'page-2', name: '無洗米' })]);
-    const messages = routeCommand('なくなった 米', ctx);
+    vi.mocked(InventoryService.search).mockReturnValue([
+      item({ name: '食器用洗剤' }), item({ pageId: 'page-2', name: '衣類用洗剤' }),
+    ]);
+    const messages = routeCommand('なくなった 洗剤', ctx);
     expect(messages).toHaveLength(2);
     expect(messages?.[1].type).toBe('flex');
   });
@@ -127,20 +129,31 @@ describe('executeBuy / 買った', () => {
     expect((messages[0] as { text: string }).text).toContain('購入履歴に記録しました');
   });
 
-  it('在庫ありのままでも購入は記録する(文言が変わる)', () => {
+  it('在庫ありのままでも購入は記録する(no-op更新はスキップ・文言が変わる)', () => {
     vi.mocked(UserService.findByLineUserId).mockReturnValue(null);
     const messages = executeBuy(item({ inStock: true }), ctx);
+    expect(InventoryService.setInStock).not.toHaveBeenCalled();
     expect(PurchaseService.record).toHaveBeenCalledWith(expect.anything(), null);
     expect((messages[0] as { text: string }).text).toContain('在庫ありのままです');
   });
 
-  it('引数なしは在庫切れの選択リスト(0件なら全品目)', () => {
-    vi.mocked(InventoryService.listShortage).mockReturnValue([item({ inStock: false })]);
-    expect(routeCommand('買った', ctx)?.[0].type).toBe('flex');
+  it('購入記録の失敗はフラグ更新済みの旨を伝える(無反応にしない)', () => {
+    vi.mocked(UserService.findByLineUserId).mockReturnValue(null);
+    vi.mocked(PurchaseService.record).mockImplementation(() => { throw new Error('Notion API error: 500'); });
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const messages = executeBuy(item({ inStock: false }), ctx);
+    expect(InventoryService.setInStock).toHaveBeenCalledWith('page-1', true);
+    expect((messages[0] as { text: string }).text).toContain('購入履歴の記録には失敗');
+  });
 
-    vi.mocked(InventoryService.listShortage).mockReturnValue([]);
+  it('引数なしは在庫切れの選択リスト(list 1回で在庫切れ0件なら全品目)', () => {
+    vi.mocked(InventoryService.list).mockReturnValue([item(), item({ pageId: 'p2', inStock: false })]);
+    expect(routeCommand('買った', ctx)?.[0].type).toBe('flex');
+    expect(InventoryService.listShortage).not.toHaveBeenCalled();
+
     vi.mocked(InventoryService.list).mockReturnValue([item()]);
     expect(routeCommand('買った', ctx)?.[0].type).toBe('flex');
+    expect(InventoryService.list).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -167,7 +180,7 @@ describe('新規登録', () => {
 
 describe('履歴・検索・編集', () => {
   it('履歴: 日付一覧のテキストを返す', () => {
-    vi.mocked(InventoryService.findByName).mockReturnValue(item());
+    vi.mocked(InventoryService.search).mockReturnValue([item({ name: '米' })]);
     vi.mocked(PurchaseService.listRecent).mockReturnValue([
       { pageId: 'h1', itemPageId: 'page-1', purchasedAt: '2026-07-10', store: null },
       { pageId: 'h2', itemPageId: 'page-1', purchasedAt: '2026-07-01', store: null },
@@ -177,7 +190,7 @@ describe('履歴・検索・編集', () => {
   });
 
   it('履歴: 0件・引数なしの案内', () => {
-    vi.mocked(InventoryService.findByName).mockReturnValue(item());
+    vi.mocked(InventoryService.search).mockReturnValue([item({ name: '米' })]);
     vi.mocked(PurchaseService.listRecent).mockReturnValue([]);
     expect((routeCommand('履歴 米', ctx)?.[0] as { text: string }).text).toContain('まだありません');
     expect((routeCommand('履歴', ctx)?.[0] as { text: string }).text).toContain('「履歴 品名」');
@@ -191,7 +204,7 @@ describe('履歴・検索・編集', () => {
   });
 
   it('編集: 編集メニューFlexを返す', () => {
-    vi.mocked(InventoryService.findByName).mockReturnValue(item());
+    vi.mocked(InventoryService.search).mockReturnValue([item({ name: '米' })]);
     const messages = routeCommand('編集 米', ctx);
     expect(messages?.[0].type).toBe('flex');
     if (messages?.[0].type === 'flex') expect(messages[0].altText).toContain('編集');

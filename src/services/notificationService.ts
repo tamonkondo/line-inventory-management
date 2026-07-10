@@ -12,22 +12,24 @@ export const NotificationService = {
    * @param reporterLineUserId 報告者(通知から除外)。nullなら全員へ
    */
   notifyOutOfStock(item: InventoryItem, reporterLineUserId: string | null): void {
-    const targets = UserService.listActive()
-      .map((user) => user.lineUserId)
-      .filter((id): id is string => Boolean(id) && id !== reporterLineUserId);
-
-    if (targets.length === 0) {
-      logInfo('NotificationService', `no targets for ${item.name}`);
-      return;
-    }
-
-    const storeLine = item.stores.length > 0 ? `購入先: ${item.stores.join(' / ')}\n` : '';
-    const text =
-      `【在庫切れ】${item.name} がなくなりました。\n` +
-      storeLine +
-      `買ったら「買った ${item.name}」と送ってください。`;
-
+    // ユーザー一覧の取得を含めて全体を握る: 通知の失敗で呼び出し側の
+    // フラグ更新・返信を巻き戻さない(listActiveのNotion障害もここで止める)
     try {
+      const targets = UserService.listActive()
+        .map((user) => user.lineUserId)
+        .filter((id): id is string => Boolean(id) && id !== reporterLineUserId);
+
+      if (targets.length === 0) {
+        logInfo('NotificationService', `no targets for ${item.name}`);
+        return;
+      }
+
+      const storeLine = item.stores.length > 0 ? `購入先: ${item.stores.join(' / ')}\n` : '';
+      const text =
+        `【在庫切れ】${item.name} がなくなりました。\n` +
+        storeLine +
+        `買ったら「買った ${item.name}」と送ってください。`;
+
       LineClient.multicast(targets, [{ type: 'text', text }]);
     } catch (err) {
       logError('NotificationService.notifyOutOfStock', err);

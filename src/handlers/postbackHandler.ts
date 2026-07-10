@@ -1,36 +1,31 @@
 import { LineClient } from '../clients/lineClient';
 import { InventoryService } from '../services/inventoryService';
 import { PurchaseService } from '../services/purchaseService';
-import { FlexBuilder } from '../messages/flexBuilder';
+import { FlexBuilder, textMessage } from '../messages/flexBuilder';
 import { SessionStore } from '../utils/sessionStore';
-import { routeCommand, executeOut, executeBuy } from '../router/commandRouter';
+import { routeCommand, executeOut, executeBuy, buildHistoryMessages } from '../router/commandRouter';
 import { logError } from '../utils/logger';
 import type { CommandContext, LineMessage, LineWebhookEvent } from '../types';
 
-const text = (body: string): LineMessage => ({ type: 'text', text: body });
-
 const RETRY_MESSAGE = '操作をやり直してください。';
 
-/** `action=out&step=pick&id=xxx` 形式のクエリ文字列を分解する */
-const parsePostbackData = (data: string): Record<string, string> => {
-  const entries = data.split('&').map((pair) => {
-    const [key, value = ''] = pair.split('=');
-    return [decodeURIComponent(key), decodeURIComponent(value)] as const;
-  });
-  const result: Record<string, string> = {};
-  for (const [key, value] of entries) result[key] = value;
-  return result;
-};
-
-/** pageIdから品目を引く。見つからなければnull(呼び出し側が案内を返す) */
-const findItem = (pageId: string) => {
+/** 不正な%シーケンスを含む値でイベント全体を落とさないためのデコード */
+const safeDecode = (value: string): string => {
   try {
-    return InventoryService.getByPageId(pageId);
-  } catch (err) {
-    logError('postbackHandler.findItem', err);
-    return null;
+    return decodeURIComponent(value);
+  } catch {
+    return value;
   }
 };
+
+/** `action=out&step=pick&id=xxx` 形式のクエリ文字列を分解する */
+const parsePostbackData = (data: string): Record<string, string> =>
+  Object.fromEntries(
+    data.split('&').map((pair) => {
+      const [key, value = ''] = pair.split('=');
+      return [safeDecode(key), safeDecode(value)];
+    }),
+  );
 
 const executePostback = (data: Record<string, string>, context: CommandContext): LineMessage[] => {
   const { action, step, id } = data;
@@ -47,16 +42,16 @@ const executePostback = (data: Record<string, string>, context: CommandContext):
     case 'out': {
       if (step === 'start') return routeCommand('なくなった', context) ?? [];
       if (step === 'pick' && id) {
-        const item = findItem(id);
-        return item ? executeOut(item, context) : [text(RETRY_MESSAGE)];
+        const item = InventoryService.getByPageId(id);
+        return item ? executeOut(item, context) : [textMessage(RETRY_MESSAGE)];
       }
       break;
     }
     case 'buy': {
       if (step === 'start') return routeCommand('買った', context) ?? [];
       if (step === 'pick' && id) {
-        const item = findItem(id);
-        return item ? executeBuy(item, context) : [text(RETRY_MESSAGE)];
+        const item = InventoryService.getByPageId(id);
+        return item ? executeBuy(item, context) : [textMessage(RETRY_MESSAGE)];
       }
       break;
     }
@@ -66,57 +61,58 @@ const executePostback = (data: Record<string, string>, context: CommandContext):
     }
     case 'detail': {
       if (!id) break;
-      const item = findItem(id);
-      if (!item) return [text(RETRY_MESSAGE)];
+      const item = InventoryService.getByPageId(id);
+      if (!item) return [textMessage(RETRY_MESSAGE)];
       return [FlexBuilder.buildItemCard(item, PurchaseService.listRecent(item.pageId, 3))];
     }
     case 'history': {
       if (!id) break;
-      const item = findItem(id);
-      if (!item) return [text(RETRY_MESSAGE)];
-      const purchases = PurchaseService.listRecent(item.pageId, 5);
-      if (purchases.length === 0) return [text(`${item.name} の購入履歴はまだありません。`)];
-      const lines = purchases.map((purchase) => `・${purchase.purchasedAt ?? '(日付不明)'}`).join('\n');
-      return [text(`${item.name} の購入履歴\n${lines}`)];
+      const item = InventoryService.getByPageId(id);
+      return item ? buildHistoryMessages(item) : [textMessage(RETRY_MESSAGE)];
     }
     case 'edit': {
       if (!id) break;
       if (step === 'menu') {
-        const item = findItem(id);
-        return item ? [FlexBuilder.buildEditMenuMessage(item)] : [text(RETRY_MESSAGE)];
+        const item = InventoryService.getByPageId(id);
+        return item ? [FlexBuilder.buildEditMenuMessage(item)] : [textMessage(RETRY_MESSAGE)];
       }
       if (step === 'field') {
         const field = data.field;
         if (field === 'name') {
           SessionStore.set(context.lineUserId, { flow: 'edit', step: 'name', data: { pageId: id } });
-          return [text('新しい名前を送ってください(やめる場合は「キャンセル」)。')];
+          return [textMessage('新しい名前を送ってください(やめる場合は「キャンセル」)。')];
         }
         if (field === 'stores') {
           SessionStore.set(context.lineUserId, { flow: 'edit', step: 'stores', data: { pageId: id } });
-          return [text('購入先を「スーパー / Amazon」のように送ってください(全置換。やめる場合は「キャンセル」)。')];
+          return [textMessage('購入先を「スーパー / Amazon」のように送ってください(全置換。やめる場合は「キャンセル」)。')];
         }
         if (field === 'photo') {
           SessionStore.set(context.lineUserId, { flow: 'attach_photo', step: 'wait', data: { pageId: id } });
-          return [text('写真を送ってください(やめる場合は「キャンセル」)。')];
+          return [textMessage('写真を送ってください(やめる場合は「キャンセル」)。')];
         }
       }
       break;
     }
     case 'cancel':
-      SessionStore.clear(context.lineUserId);
-      return [text('キャンセルしました。')];
+      return [textMessage('キャンセルしました。')];
     default:
       break;
   }
 
   logError('postbackHandler', `unknown postback: ${JSON.stringify(data)}`);
-  return [text(RETRY_MESSAGE)];
+  return [textMessage(RETRY_MESSAGE)];
 };
 
 /** リッチメニューやボタンからの postback イベントを処理する。 */
 export const handlePostback = (event: LineWebhookEvent): void => {
   const userId = event.source.userId;
   if (!userId || !event.replyToken || !event.postback) return;
+
+  // ボタンのタップは新しい操作の開始: 途中のステップ入力(新規登録の品名待ち等)が
+  // 残っていると次のテキストを誤って食ってしまうため、必ず破棄してから処理する。
+  // 各アクションが必要なセッションはこの後で自分でセットし直す。
+  SessionStore.clear(userId);
+
   const data = parsePostbackData(event.postback.data);
   const messages = executePostback(data, { lineUserId: userId });
   if (messages.length > 0) LineClient.reply(event.replyToken, messages);

@@ -120,6 +120,12 @@ describe('InventoryService 更新系', () => {
     });
   });
 
+  it('getByPageIdは取得失敗(削除済み等)でnullを返す(例外を漏らさない)', () => {
+    vi.mocked(NotionClient.retrievePage).mockImplementation(() => { throw new Error('Notion API error: 404'); });
+    expect(InventoryService.getByPageId('gone')).toBeNull();
+    expect(console.error).toHaveBeenCalled();
+  });
+
   it('数量ベースのメソッド(add/consume)が存在しない', () => {
     expect((InventoryService as Record<string, unknown>).add).toBeUndefined();
     expect((InventoryService as Record<string, unknown>).consume).toBeUndefined();

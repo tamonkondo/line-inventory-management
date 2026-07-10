@@ -6,6 +6,9 @@ import type { InventoryItem, LineMessage, Purchase } from '../types';
  * postback data の文字列は docs/implementation/11 の表と一致させること。
  */
 
+/** テキストメッセージの共通コンストラクタ(各ハンドラ・ルーターから共用) */
+export const textMessage = (text: string): LineMessage => ({ type: 'text', text });
+
 const MAX_ROWS = 20;
 const COLOR_IN_STOCK = '#06C755';
 const COLOR_OUT_OF_STOCK = '#E63946';

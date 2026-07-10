@@ -48,6 +48,12 @@ describe('NotificationService.notifyOutOfStock', () => {
     expect(LineClient.multicast).not.toHaveBeenCalled();
   });
 
+  it('listActive(Notion障害)の失敗でも例外を上に漏らさない', () => {
+    vi.mocked(UserService.listActive).mockImplementation(() => { throw new Error('Notion API error: 500'); });
+    expect(() => NotificationService.notifyOutOfStock(item(), 'U1')).not.toThrow();
+    expect(console.error).toHaveBeenCalled();
+  });
+
   it('multicast失敗でも例外を上に漏らさない', () => {
     vi.mocked(UserService.listActive).mockReturnValue([user('U2')]);
     vi.mocked(LineClient.multicast).mockImplementation(() => { throw new Error('LINE API error: 500'); });

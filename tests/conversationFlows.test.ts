@@ -10,6 +10,7 @@ vi.mock('../src/services/inventoryService', () => ({
     getByPageId: vi.fn(), create: vi.fn(), setInStock: vi.fn(),
     updateName: vi.fn(), updateStores: vi.fn(), attachPhoto: vi.fn(),
   },
+  isDuplicateItemError: (err: unknown) => err instanceof Error && err.message === 'DUPLICATE_ITEM',
 }));
 vi.mock('../src/services/purchaseService', () => ({
   PurchaseService: { record: vi.fn(), listRecent: vi.fn() },
@@ -101,6 +102,19 @@ describe('handlePostback', () => {
     handlePostback(postbackEvent('action=cancel'));
     expect(SessionStore.get('U1')).toBeNull();
     expect((repliedMessages()[0] as { text: string }).text).toBe('キャンセルしました。');
+  });
+
+  it('postbackのタップは残っていたセッションを破棄する(新規登録待ちの取り違え防止)', () => {
+    SessionStore.set('U1', { flow: 'new', step: 'name' });
+    vi.mocked(InventoryService.list).mockReturnValue([item()]);
+    handlePostback(postbackEvent('action=list'));
+    expect(SessionStore.get('U1')).toBeNull();
+  });
+
+  it('不正な%シーケンスを含むpostback dataでもクラッシュしない', () => {
+    vi.mocked(InventoryService.getByPageId).mockReturnValue(null);
+    expect(() => handlePostback(postbackEvent('action=out&step=pick&id=%E0%A4%A'))).not.toThrow();
+    expect((repliedMessages()[0] as { text: string }).text).toBe('操作をやり直してください。');
   });
 
   it('存在しないpageIdや不明actionは案内を返す', () => {

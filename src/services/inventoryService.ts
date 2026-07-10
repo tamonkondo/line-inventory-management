@@ -4,6 +4,12 @@ import { NotionMapper } from '../utils/notionMapper';
 import { logError } from '../utils/logger';
 import type { InventoryItem } from '../types';
 
+const DUPLICATE_ITEM = 'DUPLICATE_ITEM';
+
+/** InventoryService.create / updateName が投げる品名重複エラーの判定 */
+export const isDuplicateItemError = (err: unknown): boolean =>
+  err instanceof Error && err.message === DUPLICATE_ITEM;
+
 const P = NOTION_PROPS.INVENTORY;
 
 const defaultSorts = [
@@ -48,14 +54,19 @@ export const InventoryService = {
     return NotionMapper.toInventoryItem(res.results[0]);
   },
 
+  /** 取得失敗(削除済み・一時エラー)はnull(呼び出し側が案内を返せるように例外を漏らさない) */
   getByPageId(pageId: string): InventoryItem | null {
-    const page = NotionClient.retrievePage(pageId);
-    return page ? NotionMapper.toInventoryItem(page) : null;
+    try {
+      return NotionMapper.toInventoryItem(NotionClient.retrievePage(pageId));
+    } catch (err) {
+      logError('InventoryService.getByPageId', err);
+      return null;
+    }
   },
 
   /** 新規品目を在庫あり(inStock=true)で作成。同名があれば DUPLICATE_ITEM */
   create(input: { name: string; category?: string; stores?: string[] }): InventoryItem {
-    if (this.findByName(input.name)) throw new Error('DUPLICATE_ITEM');
+    if (this.findByName(input.name)) throw new Error(DUPLICATE_ITEM);
     const page = NotionClient.createPage({
       parent: { database_id: CONFIG.NOTION_INVENTORY_DB_ID },
       properties: NotionMapper.buildInventoryProperties({
@@ -77,7 +88,7 @@ export const InventoryService = {
   /** 名前変更。別ページに同名があれば DUPLICATE_ITEM */
   updateName(pageId: string, newName: string): void {
     const existing = this.findByName(newName);
-    if (existing && existing.pageId !== pageId) throw new Error('DUPLICATE_ITEM');
+    if (existing && existing.pageId !== pageId) throw new Error(DUPLICATE_ITEM);
     NotionClient.updatePage(pageId, {
       properties: NotionMapper.buildInventoryProperties({ name: newName }),
     });

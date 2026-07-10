@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { installProperties, installUrlFetch } from './helpers/gasMocks';
+import { installProperties, installUrlFetch, installUtilities } from './helpers/gasMocks';
 import { LineClient } from '../src/clients/lineClient';
 
 describe('LineClient', () => {
   beforeEach(() => {
     installProperties({ LINE_CHANNEL_ACCESS_TOKEN: 'token-xyz' });
+    installUtilities();
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
 
@@ -32,6 +33,30 @@ describe('LineClient', () => {
     const { calls } = installUrlFetch([{ code: 200, body: '{}' }]);
     LineClient.multicast(['U1', 'U2'], [{ type: 'text', text: 'x' }]);
     expect(JSON.parse(calls[0].options.payload as string).to).toEqual(['U1', 'U2']);
+  });
+
+  it('multicastは500件超を分割して送る', () => {
+    const { calls } = installUrlFetch(Array.from({ length: 3 }, () => ({ code: 200, body: '{}' })));
+    const userIds = Array.from({ length: 1001 }, (_, i) => `U${i}`);
+    LineClient.multicast(userIds, [{ type: 'text', text: 'x' }]);
+    expect(calls).toHaveLength(3);
+    expect(JSON.parse(calls[0].options.payload as string).to).toHaveLength(500);
+    expect(JSON.parse(calls[2].options.payload as string).to).toHaveLength(1);
+  });
+
+  it('pushは一時エラー(500)を1回リトライする', () => {
+    const { calls } = installUrlFetch([
+      { code: 500, body: 'transient' },
+      { code: 200, body: '{}' },
+    ]);
+    LineClient.push('U1', [{ type: 'text', text: 'x' }]);
+    expect(calls).toHaveLength(2);
+  });
+
+  it('replyはリトライしない(replyTokenは1回限り)', () => {
+    const { calls } = installUrlFetch([{ code: 500, body: 'transient' }]);
+    expect(() => LineClient.reply('rt', [{ type: 'text', text: 'x' }])).toThrow('LINE API error: 500');
+    expect(calls).toHaveLength(1);
   });
 
   it('getProfileがプロフィールを返す', () => {

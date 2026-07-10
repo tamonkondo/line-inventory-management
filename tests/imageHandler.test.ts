@@ -83,6 +83,20 @@ describe('handleImageMessage', () => {
     expect(lastReplyText()).toContain('もう一度送るか');
   });
 
+  it('登録成功後の名前取得失敗でも成功として報告する(偽の失敗メッセージを出さない)', () => {
+    SessionStore.set('U1', { flow: 'attach_photo', step: 'wait', data: { pageId: 'page-1' } });
+    vi.mocked(LineClient.getMessageContent).mockReturnValue(
+      makeBlob('bytes', 'image/jpeg') as unknown as GoogleAppsScript.Base.Blob,
+    );
+    vi.mocked(NotionClient.uploadFile).mockReturnValue('fu-1');
+    vi.mocked(InventoryService.getByPageId).mockReturnValue(null); // 取得失敗はnull契約
+
+    handleImageMessage(imageEvent);
+    expect(InventoryService.attachPhoto).toHaveBeenCalled();
+    expect(SessionStore.get('U1')).toBeNull();
+    expect(lastReplyText()).toBe('品目 に写真を登録しました 📷');
+  });
+
   it('userIdなしイベントは無視する', () => {
     handleImageMessage({ type: 'message', source: {}, message: { id: 'm', type: 'image' } });
     expect(LineClient.reply).not.toHaveBeenCalled();
