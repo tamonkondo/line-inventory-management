@@ -59,6 +59,13 @@ export const makeBlob = (data: string, contentType?: string, name?: string): Moc
   return blob;
 };
 
+/** ContentService のモック(createTextOutputの内容を取り出せる) */
+export const installContentService = (): void => {
+  g.ContentService = {
+    createTextOutput: (text: string) => ({ getContent: () => text }),
+  };
+};
+
 export interface FetchCall {
   url: string;
   options: AnyRecord;
