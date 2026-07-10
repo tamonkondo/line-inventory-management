@@ -2,13 +2,22 @@
   "name": "line-inventory-management",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "login": "clasp login",
-    "push": "clasp push",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "node esbuild.mjs && cp appsscript.json dist/",
+    "push": "npm run build && clasp push",
     "pull": "clasp pull",
     "deploy": "clasp deploy"
   },
   "devDependencies": {
-    "@google/clasp": "^3.0.0"
+    "@google/clasp": "^3.0.0",
+    "@types/google-apps-script": "^2.0.0",
+    "esbuild": "^0.25.0",
+    "esbuild-gas-plugin": "^0.10.0",
+    "typescript": "^5.5.0",
+    "vitest": "^3.0.0"
   }
 }
