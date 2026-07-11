@@ -215,6 +215,7 @@ NotionClient.uploadFile(blob: GoogleAppsScript.Base.Blob, filename: string): str
 ```
 
 `NotionPage` / `NotionQueryResponse` はNotion APIレスポンスの必要最小限の自前型(実装書04で `src/clients/notionClient.ts` に定義しexport)。
+Notion APIは `2026-03-11` を使用。データソース化(2025-09-03〜)への対応はNotionClient内部に閉じ、**サービス層はDB IDだけを扱う**(data_source_idはクライアントが自動解決)。
 
 ### 5.4 セッション(ステップ入力)
 

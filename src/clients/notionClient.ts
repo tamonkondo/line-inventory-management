@@ -1,7 +1,15 @@
 import { CONFIG } from '../config';
-import { logError } from '../utils/logger';
+import { logInfo, logError } from '../utils/logger';
 
-const NOTION_VERSION = '2022-06-28';
+/**
+ * Notion APIバージョン。2025-09-03以降、データベースは複数データソースの
+ * コンテナになり、クエリ・ページ作成はdata_source_id基準に変わった。
+ * https://developers.notion.com/reference/changes-by-version
+ */
+const NOTION_VERSION = '2026-03-11';
+
+/** data_source_id解決結果のキャッシュ期間(6時間 = CacheServiceの上限) */
+const DS_CACHE_TTL_SECONDS = 21600;
 
 export interface NotionPage {
   id: string;
@@ -26,6 +34,12 @@ export interface NotionQueryResponse {
   results: NotionPage[];
   has_more: boolean;
   next_cursor: string | null;
+}
+
+/** GET /v1/databases/{id} のレスポンス(必要フィールドのみ) */
+interface NotionDatabaseMeta {
+  id: string;
+  data_sources?: Array<{ id: string; name?: string }>;
 }
 
 const notionFetch = <T>(method: 'get' | 'post' | 'patch', path: string, payload?: object): T => {
@@ -56,14 +70,51 @@ const notionFetch = <T>(method: 'get' | 'post' | 'patch', path: string, payload?
   return JSON.parse(res.getContentText()) as T;
 };
 
-/** Notion API の汎用ラッパー(DBスキーマに依存しない) */
+/**
+ * データベースIDからdata_source_idを解決する。
+ * 設定(スクリプトプロパティ)はDB IDのままにし、解決はここに閉じ込める。
+ * 解決結果はスクリプトキャッシュに保持(データソース構成は滅多に変わらないため)。
+ */
+const resolveDataSourceId = (databaseId: string): string => {
+  const cacheKey = `notion:ds:${databaseId}`;
+  const cache = CacheService.getScriptCache();
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
+
+  const database = notionFetch<NotionDatabaseMeta>('get', `/databases/${databaseId}`);
+  const sources = database.data_sources ?? [];
+  if (sources.length === 0) {
+    throw new Error(`Notion database has no data sources: ${databaseId}`);
+  }
+  if (sources.length > 1) {
+    logInfo('NotionClient', `multiple data sources on ${databaseId}; using first (${sources[0].id})`);
+  }
+  cache.put(cacheKey, sources[0].id, DS_CACHE_TTL_SECONDS);
+  return sources[0].id;
+};
+
+/**
+ * Notion API の汎用ラッパー(DBスキーマに依存しない)。
+ * 呼び出し側はDB IDだけを扱い、data_source_idへの変換は内部で行う。
+ */
 export const NotionClient = {
+  /** DB(の先頭データソース)へのクエリ。POST /v1/data_sources/{id}/query */
   queryDatabase(databaseId: string, payload: object): NotionQueryResponse {
-    return notionFetch<NotionQueryResponse>('post', `/databases/${databaseId}/query`, payload);
+    const dataSourceId = resolveDataSourceId(databaseId);
+    return notionFetch<NotionQueryResponse>('post', `/data_sources/${dataSourceId}/query`, payload);
   },
 
+  /**
+   * ページ作成。parentに { database_id } が渡された場合は
+   * { type: 'data_source_id', data_source_id } へ自動変換する(2025-09-03以降の必須形式)
+   */
   createPage(payload: object): NotionPage {
-    return notionFetch<NotionPage>('post', '/pages', payload);
+    const body = payload as { parent?: { database_id?: string } };
+    const databaseId = body.parent?.database_id;
+    const translated = databaseId
+      ? { ...body, parent: { type: 'data_source_id', data_source_id: resolveDataSourceId(databaseId) } }
+      : payload;
+    return notionFetch<NotionPage>('post', '/pages', translated);
   },
 
   updatePage(pageId: string, payload: object): NotionPage {
@@ -90,8 +141,7 @@ export const NotionClient = {
 
   /**
    * LINE等から取得したBlobをNotionへアップロードし、file_upload IDを返す。
-   * single_part の上限は20MB。/file_uploads がAPIバージョンで弾かれる場合は
-   * このリクエストに限りNOTION_VERSIONを新しい版へ上げる(実装書15で検証)。
+   * single_part の上限は20MB。
    */
   uploadFile(blob: GoogleAppsScript.Base.Blob, filename: string): string {
     // 1) アップロード枠の作成

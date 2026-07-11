@@ -19,7 +19,7 @@
 ### 検証ポイント(未確定事項の解消)
 
 - [ ] **Rollup検証**: 購入履歴DBに手で1件作り、在庫DBの「最終購入日」に日付が出るか。出ない場合は要件11.5#1の代替案(在庫DBにDateプロパティ+GAS更新)へ切り替え、`notion-schema.md` と実装書08を更新する。
-- [ ] **File Upload API検証**: 実装書04の `test_notionUpload` を実行。`Notion-Version: 2022-06-28` で `/file_uploads` が動くか確認。エラーになる場合はそのリクエストのみバージョンを上げる(実装書04 §4参照)。
+- [ ] **File Upload API検証**: 実装書04の `test_notionUpload` を実行し、`Notion-Version: 2026-03-11` で `/file_uploads` が動くことを確認する。
 
 ## 2. LINE側セットアップ
 

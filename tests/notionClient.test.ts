@@ -1,23 +1,61 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { installProperties, installUrlFetch, installUtilities, makeBlob } from './helpers/gasMocks';
+import { installProperties, installUrlFetch, installUtilities, installCache, makeBlob } from './helpers/gasMocks';
 import { NotionClient } from '../src/clients/notionClient';
 
 const page = (id: string): string => JSON.stringify({ id, properties: {} });
+const dbMeta = (dsId = 'ds-1'): string =>
+  JSON.stringify({ id: 'db-1', data_sources: [{ id: dsId, name: 'main' }] });
+const emptyQuery = JSON.stringify({ results: [], has_more: false, next_cursor: null });
 
 describe('NotionClient', () => {
   beforeEach(() => {
     installProperties({ NOTION_TOKEN: 'ntn_test' });
     installUtilities();
+    installCache();
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
 
-  it('queryDatabaseが認証・バージョンヘッダ付きでPOSTする', () => {
-    const { calls } = installUrlFetch([{ code: 200, body: '{"results":[],"has_more":false,"next_cursor":null}' }]);
+  it('queryDatabaseがdata_source_idを解決してdata_sourcesエンドポイントへPOSTする', () => {
+    const { calls } = installUrlFetch([
+      { code: 200, body: dbMeta() },
+      { code: 200, body: emptyQuery },
+    ]);
     NotionClient.queryDatabase('db-1', { page_size: 1 });
-    expect(calls[0].url).toBe('https://api.notion.com/v1/databases/db-1/query');
-    const headers = calls[0].options.headers as Record<string, string>;
+    expect(calls).toHaveLength(2);
+    expect(calls[0].url).toBe('https://api.notion.com/v1/databases/db-1');
+    expect(calls[0].options.method).toBe('get');
+    expect(calls[1].url).toBe('https://api.notion.com/v1/data_sources/ds-1/query');
+    const headers = calls[1].options.headers as Record<string, string>;
     expect(headers.Authorization).toBe('Bearer ntn_test');
-    expect(headers['Notion-Version']).toBe('2022-06-28');
+    expect(headers['Notion-Version']).toBe('2026-03-11');
+  });
+
+  it('data_source_idの解決結果はキャッシュされ2回目以降はGETしない', () => {
+    const { calls } = installUrlFetch([
+      { code: 200, body: dbMeta() },
+      { code: 200, body: emptyQuery },
+      { code: 200, body: emptyQuery },
+    ]);
+    NotionClient.queryDatabase('db-1', {});
+    NotionClient.queryDatabase('db-1', {});
+    expect(calls).toHaveLength(3); // GET 1回 + query 2回
+    expect(calls[2].url).toBe('https://api.notion.com/v1/data_sources/ds-1/query');
+  });
+
+  it('データソースが無いDBは分かりやすいエラーになる', () => {
+    installUrlFetch([{ code: 200, body: JSON.stringify({ id: 'db-1', data_sources: [] }) }]);
+    expect(() => NotionClient.queryDatabase('db-1', {})).toThrow('no data sources');
+  });
+
+  it('createPageがparentのdatabase_idをdata_source_idへ自動変換する', () => {
+    const { calls } = installUrlFetch([
+      { code: 200, body: dbMeta() },
+      { code: 200, body: page('p1') },
+    ]);
+    NotionClient.createPage({ parent: { database_id: 'db-1' }, properties: {} });
+    const sent = JSON.parse(calls[1].options.payload as string) as { parent: unknown };
+    expect(sent.parent).toEqual({ type: 'data_source_id', data_source_id: 'ds-1' });
   });
 
   it('429で1回リトライして成功する', () => {
@@ -62,13 +100,14 @@ describe('NotionClient', () => {
 
   it('queryAllがpaginationを辿り、引数payloadを破壊しない', () => {
     const { calls } = installUrlFetch([
+      { code: 200, body: dbMeta() },
       { code: 200, body: JSON.stringify({ results: [{ id: 'a', properties: {} }], has_more: true, next_cursor: 'cur-1' }) },
       { code: 200, body: JSON.stringify({ results: [{ id: 'b', properties: {} }], has_more: false, next_cursor: null }) },
     ]);
     const payload = { sorts: [] };
     const pages = NotionClient.queryAll('db-1', payload);
     expect(pages.map((p) => p.id)).toEqual(['a', 'b']);
-    expect(JSON.parse(calls[1].options.payload as string).start_cursor).toBe('cur-1');
+    expect(JSON.parse(calls[2].options.payload as string).start_cursor).toBe('cur-1');
     expect('start_cursor' in payload).toBe(false);
   });
 

@@ -38,13 +38,26 @@ export interface NotionQueryResponse {
 }
 ```
 
-## 2. 共通fetch
+## 2. 共通fetch と data_source_id 解決
+
+**APIバージョンは `2026-03-11`** を使う。2025-09-03以降、データベースは複数データソースの
+コンテナになり、クエリは `POST /v1/data_sources/{id}/query`、ページ作成の親は
+`data_source_id` 基準に変わった(https://developers.notion.com/reference/changes-by-version)。
+
+**設計方針**: スクリプトプロパティにはこれまでどおり**データベースID**を持たせ、
+`GET /v1/databases/{id}` のレスポンスの `data_sources` 配列から data_source_id を
+**クライアント内部で解決**する(スクリプトキャッシュに6時間保持)。呼び出し側(サービス層)は
+DB IDだけを扱い、データソースの概念を意識しない。
 
 ```ts
 import { CONFIG } from '../config';
-import { logError } from '../utils/logger';
+import { logInfo, logError } from '../utils/logger';
 
-const NOTION_VERSION = '2022-06-28';
+const NOTION_VERSION = '2026-03-11';
+const DS_CACHE_TTL_SECONDS = 21600; // 6時間
+
+/** GET /v1/databases/{id} → data_sources[0].id を返す(キャッシュ付き)。0件は明示エラー */
+const resolveDataSourceId = (databaseId: string): string => { ... };
 
 const notionFetch = <T>(method: 'get' | 'post' | 'patch', path: string, payload?: object): T => {
   const options: GoogleAppsScript.URL_Fetch.URLFetchRequestOptions = {
@@ -78,13 +91,14 @@ const notionFetch = <T>(method: 'get' | 'post' | 'patch', path: string, payload?
 
 ```ts
 export const NotionClient = {
+  /** DB(の先頭データソース)へのクエリ。内部でdata_source_idを解決する */
   queryDatabase(databaseId: string, payload: object): NotionQueryResponse {
-    return notionFetch<NotionQueryResponse>('post', `/databases/${databaseId}/query`, payload);
+    const dataSourceId = resolveDataSourceId(databaseId);
+    return notionFetch<NotionQueryResponse>('post', `/data_sources/${dataSourceId}/query`, payload);
   },
 
-  createPage(payload: object): NotionPage {
-    return notionFetch<NotionPage>('post', '/pages', payload);
-  },
+  /** parentが { database_id } なら { type:'data_source_id', data_source_id } へ自動変換して作成 */
+  createPage(payload: object): NotionPage { ... },
 
   updatePage(pageId: string, payload: object): NotionPage {
     return notionFetch<NotionPage>('patch', `/pages/${pageId}`, payload);
@@ -146,8 +160,8 @@ export const NotionClient = {
 ## 4. 注意点
 
 - single_part の上限は20MB。超えたら例外でよい(呼び出し側がユーザーに謝るメッセージを返す)。
-- `/file_uploads` エンドポイントが `Notion-Version: 2022-06-28` で弾かれる場合は、**このリクエストに限り**ヘッダを新しい版(例: `2025-09-03`)へ上げる。先に実挙動を確認してから決めること(実装書15のセットアップ時に検証)。
 - GASでは `payload` にBlobを含むオブジェクトを渡すと UrlFetchApp が自動で multipart/form-data にする。
+- `updatePage` / `retrievePage` / `uploadFile` はページ・ファイル単位のAPIのため、データソース化の影響を受けない(パス変更なし)。
 
 ## 5. 受け入れ基準
 
