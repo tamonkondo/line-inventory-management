@@ -114,6 +114,8 @@ export const deleteRichMenu = (richMenuId: string): void => { ... };
 
 ## 5. 動作確認方法
 
-1. 仮画像(区画線+ラベルだけでよい)をDriveに置き、ファイルIDをスクリプトプロパティに設定。
+1. 仮画像をDriveに置き、ファイルIDをスクリプトプロパティに設定。
+   **`assets/richmenu/richmenu-placeholder.png`(2500×1686・6区画のラベル入り)をそのまま使える。**
+   本番用のデザイン画像に差し替える場合も同サイズ・同区画で作ること。
 2. GASエディタで `setupRichMenu()` を実行。
 3. 実機LINEでトークを開き、メニュー表示と6ボタンの動作を確認(ハンドラ実装前はpostbackが無反応でよい。Webhookログにイベントが届いていればOK)。
