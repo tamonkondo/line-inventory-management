@@ -44,20 +44,15 @@ export interface NotionQueryResponse {
 コンテナになり、クエリは `POST /v1/data_sources/{id}/query`、ページ作成の親は
 `data_source_id` 基準に変わった(https://developers.notion.com/reference/changes-by-version)。
 
-**設計方針**: スクリプトプロパティにはこれまでどおり**データベースID**を持たせ、
-`GET /v1/databases/{id}` のレスポンスの `data_sources` 配列から data_source_id を
-**クライアント内部で解決**する(スクリプトキャッシュに6時間保持)。呼び出し側(サービス層)は
-DB IDだけを扱い、データソースの概念を意識しない。
+**設計方針**: スクリプトプロパティ(`NOTION_*_DB_ID`)には各DBの**データソースID**を設定する
+(Notion: DB設定 → データソースを管理 → データソースIDをコピー)。データベースID(コンテナ)は使わない。
+クライアントは設定値をそのままデータソースIDとして扱い、変換処理を持たない。
 
 ```ts
 import { CONFIG } from '../config';
-import { logInfo, logError } from '../utils/logger';
+import { logError } from '../utils/logger';
 
 const NOTION_VERSION = '2026-03-11';
-const DS_CACHE_TTL_SECONDS = 21600; // 6時間
-
-/** GET /v1/databases/{id} → data_sources[0].id を返す(キャッシュ付き)。0件は明示エラー */
-const resolveDataSourceId = (databaseId: string): string => { ... };
 
 const notionFetch = <T>(method: 'get' | 'post' | 'patch', path: string, payload?: object): T => {
   const options: GoogleAppsScript.URL_Fetch.URLFetchRequestOptions = {
@@ -91,14 +86,15 @@ const notionFetch = <T>(method: 'get' | 'post' | 'patch', path: string, payload?
 
 ```ts
 export const NotionClient = {
-  /** DB(の先頭データソース)へのクエリ。内部でdata_source_idを解決する */
-  queryDatabase(databaseId: string, payload: object): NotionQueryResponse {
-    const dataSourceId = resolveDataSourceId(databaseId);
+  /** データソースへのクエリ。POST /v1/data_sources/{id}/query */
+  queryDataSource(dataSourceId: string, payload: object): NotionQueryResponse {
     return notionFetch<NotionQueryResponse>('post', `/data_sources/${dataSourceId}/query`, payload);
   },
 
-  /** parentが { database_id } なら { type:'data_source_id', data_source_id } へ自動変換して作成 */
-  createPage(payload: object): NotionPage { ... },
+  /** ページ作成。parentは { type: 'data_source_id', data_source_id } 形式で渡すこと */
+  createPage(payload: object): NotionPage {
+    return notionFetch<NotionPage>('post', '/pages', payload);
+  },
 
   updatePage(pageId: string, payload: object): NotionPage {
     return notionFetch<NotionPage>('patch', `/pages/${pageId}`, payload);
@@ -108,14 +104,14 @@ export const NotionClient = {
     return notionFetch<NotionPage>('get', `/pages/${pageId}`);
   },
 
-  /** queryDatabaseのpaginationを吸収して全ページ配列を返す(引数payloadは破壊しない) */
-  queryAll(databaseId: string, payload?: object): NotionPage[] {
+  /** queryDataSourceのpaginationを吸収して全ページ配列を返す(引数payloadは破壊しない) */
+  queryAll(dataSourceId: string, payload?: object): NotionPage[] {
     const results: NotionPage[] = [];
     let cursor: string | null = null;
     do {
       const body: Record<string, unknown> = { ...(payload ?? {}) };
       if (cursor) body.start_cursor = cursor;
-      const res = this.queryDatabase(databaseId, body);
+      const res = this.queryDataSource(dataSourceId, body);
       results.push(...res.results);
       cursor = res.has_more ? res.next_cursor : null;
     } while (cursor);

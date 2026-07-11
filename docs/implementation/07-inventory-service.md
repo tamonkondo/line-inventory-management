@@ -69,7 +69,7 @@ export const InventoryService = {
 - ページ作成。在庫ありは **true で作成**(登録=買ってある前提。なければ直後に「なくなった」報告すればよい):
   ```ts
   const page = NotionClient.createPage({
-    parent: { database_id: DB_ID() },
+    parent: { type: 'data_source_id', data_source_id: DB_ID() },
     properties: NotionMapper.buildInventoryProperties({
       name: input.name,
       inStock: true,

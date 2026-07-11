@@ -24,7 +24,7 @@ const todayStr = (): string => Utilities.formatDate(new Date(), 'Asia/Tokyo', 'y
 export const UserService = {
   /** lineUserIdで1件検索 */
   findByLineUserId(lineUserId: string): User | null {
-    const res = NotionClient.queryDatabase(CONFIG.NOTION_USERS_DB_ID, {
+    const res = NotionClient.queryDataSource(CONFIG.NOTION_USERS_DB_ID, {
       filter: { property: P.LINE_USER_ID, rich_text: { equals: lineUserId } },
       page_size: 1,
     });
@@ -57,7 +57,7 @@ export const UserService = {
    - ユーザーDBへページ作成:
      ```ts
      const page = NotionClient.createPage({
-       parent: { database_id: CONFIG.NOTION_USERS_DB_ID },
+       parent: { type: 'data_source_id', data_source_id: CONFIG.NOTION_USERS_DB_ID },
        properties: {
          [P.NAME]: { title: [{ text: { content: displayName } }] },
          [P.LINE_USER_ID]: { rich_text: [{ text: { content: lineUserId } }] },

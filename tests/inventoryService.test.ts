@@ -3,7 +3,7 @@ import { installProperties } from './helpers/gasMocks';
 
 vi.mock('../src/clients/notionClient', () => ({
   NotionClient: {
-    queryDatabase: vi.fn(),
+    queryDataSource: vi.fn(),
     queryAll: vi.fn(),
     createPage: vi.fn(),
     updatePage: vi.fn(),
@@ -51,10 +51,10 @@ describe('InventoryService 参照系', () => {
   });
 
   it('findByNameが0件でnull、複数件で先頭+エラーログ', () => {
-    vi.mocked(NotionClient.queryDatabase).mockReturnValue(emptyQuery);
+    vi.mocked(NotionClient.queryDataSource).mockReturnValue(emptyQuery);
     expect(InventoryService.findByName('ない')).toBeNull();
 
-    vi.mocked(NotionClient.queryDatabase).mockReturnValue({
+    vi.mocked(NotionClient.queryDataSource).mockReturnValue({
       results: [itemPage('a', '米', true), itemPage('b', '米', false)],
       has_more: false, next_cursor: null,
     });
@@ -66,7 +66,7 @@ describe('InventoryService 参照系', () => {
 
 describe('InventoryService.create', () => {
   it('重複名でDUPLICATE_ITEMを投げる', () => {
-    vi.mocked(NotionClient.queryDatabase).mockReturnValue({
+    vi.mocked(NotionClient.queryDataSource).mockReturnValue({
       results: [itemPage('a', '米', true)], has_more: false, next_cursor: null,
     });
     expect(() => InventoryService.create({ name: '米' })).toThrow('DUPLICATE_ITEM');
@@ -74,7 +74,7 @@ describe('InventoryService.create', () => {
   });
 
   it('inStock=trueで作成し、任意項目は渡された場合のみ含める', () => {
-    vi.mocked(NotionClient.queryDatabase).mockReturnValue(emptyQuery);
+    vi.mocked(NotionClient.queryDataSource).mockReturnValue(emptyQuery);
     vi.mocked(NotionClient.createPage).mockReturnValue(itemPage('new', 'トイレットペーパー', true));
 
     const item = InventoryService.create({ name: 'トイレットペーパー', stores: ['スーパー'] });
@@ -97,12 +97,12 @@ describe('InventoryService 更新系', () => {
   });
 
   it('updateNameが別ページの同名でDUPLICATE_ITEM、同一ページなら許可', () => {
-    vi.mocked(NotionClient.queryDatabase).mockReturnValue({
+    vi.mocked(NotionClient.queryDataSource).mockReturnValue({
       results: [itemPage('other', '米', true)], has_more: false, next_cursor: null,
     });
     expect(() => InventoryService.updateName('page-1', '米')).toThrow('DUPLICATE_ITEM');
 
-    vi.mocked(NotionClient.queryDatabase).mockReturnValue({
+    vi.mocked(NotionClient.queryDataSource).mockReturnValue({
       results: [itemPage('page-1', '米', true)], has_more: false, next_cursor: null,
     });
     InventoryService.updateName('page-1', '米');

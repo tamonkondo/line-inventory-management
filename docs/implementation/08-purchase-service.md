@@ -27,7 +27,7 @@ export const PurchaseService = {
   record(item: InventoryItem, userPageId: string | null): void {
     const today = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd');
     NotionClient.createPage({
-      parent: { database_id: CONFIG.NOTION_PURCHASES_DB_ID },
+      parent: { type: 'data_source_id', data_source_id: CONFIG.NOTION_PURCHASES_DB_ID },
       properties: {
         [P.NAME]: { title: [{ text: { content: `${item.name} ${today}` } }] },
         [P.ITEM]: { relation: [{ id: item.pageId }] },
@@ -39,7 +39,7 @@ export const PurchaseService = {
 
   /** 品目の直近購入履歴(購入日降順・最大limit件、既定5件) */
   listRecent(itemPageId: string, limit = 5): Purchase[] {
-    const res = NotionClient.queryDatabase(CONFIG.NOTION_PURCHASES_DB_ID, {
+    const res = NotionClient.queryDataSource(CONFIG.NOTION_PURCHASES_DB_ID, {
       filter: { property: P.ITEM, relation: { contains: itemPageId } },
       sorts: [{ property: P.PURCHASED_AT, direction: 'descending' }],
       page_size: limit,

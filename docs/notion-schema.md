@@ -62,5 +62,5 @@ DB 作成後に、実際のデータベースID・プロパティ名をここに
 
 ## 確定後に記載する項目（TODO）
 
-- 各DBの database_id
+- 各DBのデータソースID(data_source_id)
 - Multi-select / Select の初期選択肢

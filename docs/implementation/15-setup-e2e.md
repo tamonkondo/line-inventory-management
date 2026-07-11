@@ -11,10 +11,10 @@
    - ユーザーDB(Users): 表示名(Title)/LINE User ID(Text)/ステータス(Select: 有効・無効)/登録日(Date)
    - 購入履歴DB(PurchaseHistory): 名前(Title)/対象品目(Relation→在庫DB)/購入日(Date)/購入先(Select)/記録者(Relation→ユーザーDB)
 3. **3つのDBすべてをIntegrationに共有**(Connections に追加)する。忘れると404になる。
-4. 各DBのIDをURLから控える(`notion.so/<workspace>/<DB_ID>?v=...` の32桁)。
+4. 各DBの**データソースID**を控える(DBを開く → データベース設定 → データソースを管理 → 「⋯」→ データソースIDをコピー)。データベースID(URLの32桁)は使わない。
 5. **プロパティ名がコードの `NOTION_PROPS`(`src/config.ts`)と完全一致していることを確認**(全角/半角・スペースに注意)。
 6. 在庫DBにテストデータを2〜3件入れる。
-7. `docs/notion-schema.md` の「確定後に記載する項目」にDB IDを記入する。
+7. `docs/notion-schema.md` の「確定後に記載する項目」にデータソースIDを記入する。
 
 ### 検証ポイント(未確定事項の解消)
 
@@ -47,9 +47,9 @@
 | `LINE_CHANNEL_ACCESS_TOKEN` | LINEチャネルアクセストークン |
 | `LINE_CHANNEL_SECRET` | LINEチャネルシークレット |
 | `NOTION_TOKEN` | Notion Integration Token |
-| `NOTION_INVENTORY_DB_ID` | 在庫DBのID |
-| `NOTION_USERS_DB_ID` | ユーザーDBのID |
-| `NOTION_PURCHASES_DB_ID` | 購入履歴DBのID |
+| `NOTION_INVENTORY_DB_ID` | 在庫DBのデータソースID |
+| `NOTION_USERS_DB_ID` | ユーザーDBのデータソースID |
+| `NOTION_PURCHASES_DB_ID` | 購入履歴DBのデータソースID |
 | `RICHMENU_IMAGE_FILE_ID` | リッチメニュー画像のDriveファイルID |
 
 (`CLASP_SCRIPT_ID` は `.clasp.json` 用なのでスクリプトプロパティには不要)

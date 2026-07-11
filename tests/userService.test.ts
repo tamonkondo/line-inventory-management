@@ -3,7 +3,7 @@ import { installProperties, installUtilities } from './helpers/gasMocks';
 
 vi.mock('../src/clients/notionClient', () => ({
   NotionClient: {
-    queryDatabase: vi.fn(),
+    queryDataSource: vi.fn(),
     queryAll: vi.fn(),
     createPage: vi.fn(),
     updatePage: vi.fn(),
@@ -39,7 +39,7 @@ beforeEach(() => {
 
 describe('UserService.register', () => {
   it('未登録なら表示名を取得してページを作成する', () => {
-    vi.mocked(NotionClient.queryDatabase).mockReturnValue(emptyQuery);
+    vi.mocked(NotionClient.queryDataSource).mockReturnValue(emptyQuery);
     vi.mocked(LineClient.getProfile).mockReturnValue({ displayName: '太郎', userId: 'U1' });
     vi.mocked(NotionClient.createPage).mockReturnValue(userPage('u-page', '太郎', 'U1', '有効'));
 
@@ -53,7 +53,7 @@ describe('UserService.register', () => {
   });
 
   it('既存ユーザーは再有効化のみでページを増やさない', () => {
-    vi.mocked(NotionClient.queryDatabase).mockReturnValue({
+    vi.mocked(NotionClient.queryDataSource).mockReturnValue({
       results: [userPage('u-page', '太郎', 'U1', '無効')], has_more: false, next_cursor: null,
     });
     const user = UserService.register('U1');
@@ -65,7 +65,7 @@ describe('UserService.register', () => {
   });
 
   it('getProfile失敗でも(不明)で登録を続行する', () => {
-    vi.mocked(NotionClient.queryDatabase).mockReturnValue(emptyQuery);
+    vi.mocked(NotionClient.queryDataSource).mockReturnValue(emptyQuery);
     vi.mocked(LineClient.getProfile).mockImplementation(() => { throw new Error('403'); });
     vi.mocked(NotionClient.createPage).mockReturnValue(userPage('u-page', '(不明)', 'U1', '有効'));
 
@@ -80,13 +80,13 @@ describe('UserService.register', () => {
 
 describe('UserService.deactivate / listActive', () => {
   it('未登録ユーザーのdeactivateは何もしない', () => {
-    vi.mocked(NotionClient.queryDatabase).mockReturnValue(emptyQuery);
+    vi.mocked(NotionClient.queryDataSource).mockReturnValue(emptyQuery);
     UserService.deactivate('U-unknown');
     expect(NotionClient.updatePage).not.toHaveBeenCalled();
   });
 
   it('登録済みユーザーを無効化する', () => {
-    vi.mocked(NotionClient.queryDatabase).mockReturnValue({
+    vi.mocked(NotionClient.queryDataSource).mockReturnValue({
       results: [userPage('u-page', '太郎', 'U1', '有効')], has_more: false, next_cursor: null,
     });
     UserService.deactivate('U1');
@@ -107,7 +107,7 @@ describe('UserService.deactivate / listActive', () => {
 
 describe('followHandler', () => {
   it('followで登録してあいさつを返信する', () => {
-    vi.mocked(NotionClient.queryDatabase).mockReturnValue(emptyQuery);
+    vi.mocked(NotionClient.queryDataSource).mockReturnValue(emptyQuery);
     vi.mocked(LineClient.getProfile).mockReturnValue({ displayName: '太郎', userId: 'U1' });
     vi.mocked(NotionClient.createPage).mockReturnValue(userPage('u-page', '太郎', 'U1', '有効'));
 
@@ -121,12 +121,12 @@ describe('followHandler', () => {
   it('userIdのないsourceでは何もしない', () => {
     handleFollow({ type: 'follow', replyToken: 'rt', source: {} });
     handleUnfollow({ type: 'unfollow', source: {} });
-    expect(NotionClient.queryDatabase).not.toHaveBeenCalled();
+    expect(NotionClient.queryDataSource).not.toHaveBeenCalled();
     expect(LineClient.reply).not.toHaveBeenCalled();
   });
 
   it('unfollowで無効化する(返信しない)', () => {
-    vi.mocked(NotionClient.queryDatabase).mockReturnValue({
+    vi.mocked(NotionClient.queryDataSource).mockReturnValue({
       results: [userPage('u-page', '太郎', 'U1', '有効')], has_more: false, next_cursor: null,
     });
     handleUnfollow({ type: 'unfollow', source: { userId: 'U1' } });

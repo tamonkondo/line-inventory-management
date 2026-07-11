@@ -9,6 +9,8 @@ export const CONFIG = {
   get LINE_CHANNEL_ACCESS_TOKEN() { return prop('LINE_CHANNEL_ACCESS_TOKEN'); },
   get LINE_CHANNEL_SECRET()       { return prop('LINE_CHANNEL_SECRET'); },
   get NOTION_TOKEN()              { return prop('NOTION_TOKEN'); },
+  // NOTION_*_DB_ID には各DBの「データソースID」を設定する
+  // (Notion: DB設定 → データソースを管理 → データソースIDをコピー)
   get NOTION_INVENTORY_DB_ID()    { return prop('NOTION_INVENTORY_DB_ID'); },
   get NOTION_USERS_DB_ID()        { return prop('NOTION_USERS_DB_ID'); },
   get NOTION_PURCHASES_DB_ID()    { return prop('NOTION_PURCHASES_DB_ID'); },

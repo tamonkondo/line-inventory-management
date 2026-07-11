@@ -43,7 +43,7 @@ export const InventoryService = {
 
   /** 品名完全一致。複数ヒット時はログを残して先頭を返す */
   findByName(name: string): InventoryItem | null {
-    const res = NotionClient.queryDatabase(CONFIG.NOTION_INVENTORY_DB_ID, {
+    const res = NotionClient.queryDataSource(CONFIG.NOTION_INVENTORY_DB_ID, {
       filter: { property: P.NAME, title: { equals: name } },
       page_size: 2,
     });
@@ -68,7 +68,7 @@ export const InventoryService = {
   create(input: { name: string; category?: string; stores?: string[] }): InventoryItem {
     if (this.findByName(input.name)) throw new Error(DUPLICATE_ITEM);
     const page = NotionClient.createPage({
-      parent: { database_id: CONFIG.NOTION_INVENTORY_DB_ID },
+      parent: { type: 'data_source_id', data_source_id: CONFIG.NOTION_INVENTORY_DB_ID },
       properties: NotionMapper.buildInventoryProperties({
         name: input.name,
         inStock: true,

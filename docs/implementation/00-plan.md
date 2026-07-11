@@ -206,7 +206,7 @@ LineClient.multicast(userIds: string[], messages: LineMessage[]): void
 LineClient.getProfile(userId: string): { displayName: string; userId: string }
 LineClient.getMessageContent(messageId: string): GoogleAppsScript.Base.Blob
 
-NotionClient.queryDatabase(databaseId: string, payload: object): NotionQueryResponse
+NotionClient.queryDataSource(dataSourceId: string, payload: object): NotionQueryResponse
 NotionClient.queryAll(databaseId: string, payload?: object): NotionPage[] // pagination吸収
 NotionClient.createPage(payload: object): NotionPage
 NotionClient.updatePage(pageId: string, payload: object): NotionPage
