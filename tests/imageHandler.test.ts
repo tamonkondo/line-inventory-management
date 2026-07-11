@@ -23,7 +23,7 @@ const imageEvent: LineWebhookEvent = {
 };
 
 const item: InventoryItem = {
-  pageId: 'page-1', name: 'ラップ', inStock: true, category: null, photoUrl: null,
+  pageId: 'page-1', notionUrl: 'https://www.notion.so/page1', name: 'ラップ', inStock: true, category: null, photoUrl: null,
   stores: [], memo: null, lastPurchasedAt: null,
 };
 
@@ -72,7 +72,7 @@ describe('handleImageMessage', () => {
   it('セッションなしなら操作案内のみ(アップロードしない)', () => {
     handleImageMessage(imageEvent);
     expect(NotionClient.uploadFile).not.toHaveBeenCalled();
-    expect(lastReplyText()).toContain('「編集 品名」→「写真を変える」');
+    expect(lastReplyText()).toContain('Notionの品目ページで直接追加');
   });
 
   it('失敗時はセッション維持で再試行を案内する', () => {

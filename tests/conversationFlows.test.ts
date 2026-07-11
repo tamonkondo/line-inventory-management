@@ -9,7 +9,6 @@ vi.mock('../src/services/inventoryService', () => ({
     list: vi.fn(), listShortage: vi.fn(), search: vi.fn(), findByName: vi.fn(),
     getByPageId: vi.fn(), create: vi.fn(), setInStock: vi.fn(),
     updateName: vi.fn(), updateStores: vi.fn(), attachPhoto: vi.fn(),
-    getCategoryOptions: vi.fn(), getStoreOptions: vi.fn(),
   },
   isDuplicateItemError: (err: unknown) => err instanceof Error && err.message === 'DUPLICATE_ITEM',
 }));
@@ -37,7 +36,7 @@ import { handleMessage } from '../src/handlers/messageHandler';
 import type { InventoryItem, LineMessage, LineWebhookEvent } from '../src/types';
 
 const item = (overrides: Partial<InventoryItem> = {}): InventoryItem => ({
-  pageId: 'page-1', name: '米', inStock: true, category: null, photoUrl: null,
+  pageId: 'page-1', notionUrl: 'https://www.notion.so/page1', name: '米', inStock: true, category: null, photoUrl: null,
   stores: [], memo: null, lastPurchasedAt: null, ...overrides,
 });
 
@@ -53,11 +52,8 @@ const repliedMessages = (): LineMessage[] => {
 };
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
   installCache();
-  // 選択肢なし=従来どおり即作成、が既定の前提
-  vi.mocked(InventoryService.getCategoryOptions).mockReturnValue([]);
-  vi.mocked(InventoryService.getStoreOptions).mockReturnValue([]);
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
 });
 
@@ -90,15 +86,10 @@ describe('handlePostback', () => {
     expect(repliedMessages()[0].type).toBe('flex');
   });
 
-  it('edit&step=field&field=nameでセッションをセットして入力を促す', () => {
-    handlePostback(postbackEvent('action=edit&step=field&field=name&id=page-1'));
-    expect(SessionStore.get('U1')).toEqual({ flow: 'edit', step: 'name', data: { pageId: 'page-1' } });
-    expect((repliedMessages()[0] as { text: string }).text).toContain('新しい名前');
-  });
-
-  it('edit&step=field&field=photoでattach_photoセッション', () => {
-    handlePostback(postbackEvent('action=edit&step=field&field=photo&id=page-1'));
-    expect(SessionStore.get('U1')).toEqual({ flow: 'attach_photo', step: 'wait', data: { pageId: 'page-1' } });
+  it('旧カードのeditポストバックにはNotionのURL案内で応える(後方互換: R-14)', () => {
+    vi.mocked(InventoryService.getByPageId).mockReturnValue(item());
+    handlePostback(postbackEvent('action=edit&step=menu&id=page-1'));
+    expect((repliedMessages()[0] as { text: string }).text).toContain('https://www.notion.so/page1');
   });
 
   it('cancelでセッションを破棄する', () => {
@@ -165,30 +156,16 @@ describe('handleMessage', () => {
     handleMessage(textEvent('ラップ'));
     expect(InventoryService.create).toHaveBeenCalledWith({ name: 'ラップ' });
     expect(SessionStore.get('U1')).toEqual({ flow: 'attach_photo', step: 'wait', data: { pageId: 'new-page' } });
-    expect(repliedMessages()).toHaveLength(3);
+    expect(repliedMessages()).toHaveLength(2);
+    expect((repliedMessages()[0] as { text: string }).text).toContain('https://www.notion.so/page1');
   });
 
   it('newセッション中の重複名はセッション維持で再入力を促す', () => {
     SessionStore.set('U1', { flow: 'new', step: 'name' });
-    vi.mocked(InventoryService.findByName).mockReturnValue(item({ name: '米' }));
+    vi.mocked(InventoryService.create).mockImplementation(() => { throw new Error('DUPLICATE_ITEM'); });
     handleMessage(textEvent('米'));
     expect(SessionStore.get('U1')).toEqual({ flow: 'new', step: 'name' });
     expect((repliedMessages()[0] as { text: string }).text).toContain('すでにあります');
-    expect(InventoryService.create).not.toHaveBeenCalled();
-  });
-
-  it('edit/nameセッションで名前を変更してセッション終了', () => {
-    SessionStore.set('U1', { flow: 'edit', step: 'name', data: { pageId: 'page-1' } });
-    handleMessage(textEvent('無洗米'));
-    expect(InventoryService.updateName).toHaveBeenCalledWith('page-1', '無洗米');
-    expect(SessionStore.get('U1')).toBeNull();
-  });
-
-  it('edit/storesセッションで区切り文字を分解して全置換', () => {
-    SessionStore.set('U1', { flow: 'edit', step: 'stores', data: { pageId: 'page-1' } });
-    handleMessage(textEvent('スーパー / Amazon、ドラッグストア'));
-    expect(InventoryService.updateStores).toHaveBeenCalledWith('page-1', ['スーパー', 'Amazon', 'ドラッグストア']);
-    expect(SessionStore.get('U1')).toBeNull();
   });
 
   it('attach_photoセッション中のテキストは写真を促してセッション維持', () => {
@@ -202,79 +179,5 @@ describe('handleMessage', () => {
     vi.mocked(InventoryService.listShortage).mockReturnValue([]);
     handleMessage(textEvent('不足'));
     expect((repliedMessages()[0] as { text: string }).text).toContain('不足はありません');
-  });
-});
-
-describe('新規登録の選択フロー (R-13)', () => {
-  beforeEach(() => {
-    vi.mocked(InventoryService.findByName).mockReturnValue(null);
-    vi.mocked(InventoryService.getCategoryOptions).mockReturnValue(['洗剤', '食品']);
-    vi.mocked(InventoryService.getStoreOptions).mockReturnValue(['スーパー', 'Amazon']);
-  });
-
-  it('品名入力→カテゴリ選択→購入先トグル→決定で選択内容つきで作成される', () => {
-    // 品名入力
-    SessionStore.set('U1', { flow: 'new', step: 'name' });
-    handleMessage(textEvent('ラップ'));
-    expect(SessionStore.get('U1')).toEqual({ flow: 'new', step: 'category', data: { name: 'ラップ' } });
-
-    // カテゴリ選択
-    handlePostback(postbackEvent('action=new&step=category&value=%E6%B4%97%E5%89%A4')); // 洗剤
-    expect(SessionStore.get('U1')).toEqual({
-      flow: 'new', step: 'stores', data: { name: 'ラップ', category: '洗剤', stores: [] },
-    });
-
-    // 購入先を2つトグル
-    handlePostback(postbackEvent('action=new&step=store&value=%E3%82%B9%E3%83%BC%E3%83%91%E3%83%BC')); // スーパー
-    handlePostback(postbackEvent('action=new&step=store&value=Amazon'));
-    const session = SessionStore.get('U1');
-    expect(session).toEqual({
-      flow: 'new', step: 'stores', data: { name: 'ラップ', category: '洗剤', stores: ['スーパー', 'Amazon'] },
-    });
-
-    // 決定 → 作成
-    vi.mocked(InventoryService.create).mockReturnValue(item({ pageId: 'new-page', name: 'ラップ' }));
-    handlePostback(postbackEvent('action=new&step=storesDone'));
-    expect(InventoryService.create).toHaveBeenCalledWith({
-      name: 'ラップ', category: '洗剤', stores: ['スーパー', 'Amazon'],
-    });
-    expect(SessionStore.get('U1')).toEqual({ flow: 'attach_photo', step: 'wait', data: { pageId: 'new-page' } });
-  });
-
-  it('カテゴリのスキップ(value空)はcategory=nullで購入先選択へ', () => {
-    SessionStore.set('U1', { flow: 'new', step: 'category', data: { name: 'ラップ' } });
-    handlePostback(postbackEvent('action=new&step=category&value='));
-    expect(SessionStore.get('U1')).toEqual({
-      flow: 'new', step: 'stores', data: { name: 'ラップ', category: null, stores: [] },
-    });
-  });
-
-  it('選択済み項目の再タップで選択解除される', () => {
-    SessionStore.set('U1', {
-      flow: 'new', step: 'stores', data: { name: 'ラップ', category: null, stores: ['Amazon'] },
-    });
-    handlePostback(postbackEvent('action=new&step=store&value=Amazon'));
-    expect(SessionStore.get('U1')).toEqual({
-      flow: 'new', step: 'stores', data: { name: 'ラップ', category: null, stores: [] },
-    });
-  });
-
-  it('選択ステップのpostbackはセッションを破棄しない(継続の例外)', () => {
-    SessionStore.set('U1', { flow: 'new', step: 'category', data: { name: 'ラップ' } });
-    handlePostback(postbackEvent('action=new&step=category&value=%E6%B4%97%E5%89%A4'));
-    expect(SessionStore.get('U1')).not.toBeNull();
-  });
-
-  it('セッション失効後の選択タップは再開を促す(品目を作らない)', () => {
-    handlePostback(postbackEvent('action=new&step=storesDone'));
-    expect(InventoryService.create).not.toHaveBeenCalled();
-    expect((repliedMessages()[0] as { text: string }).text).toContain('やり直してください');
-  });
-
-  it('選択ステップ中のテキストはボタン操作を促す(セッション維持)', () => {
-    SessionStore.set('U1', { flow: 'new', step: 'category', data: { name: 'ラップ' } });
-    handleMessage(textEvent('洗剤'));
-    expect((repliedMessages()[0] as { text: string }).text).toContain('ボタンから選んでください');
-    expect(SessionStore.get('U1')).toEqual({ flow: 'new', step: 'category', data: { name: 'ラップ' } });
   });
 });

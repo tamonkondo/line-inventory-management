@@ -63,15 +63,6 @@ describe('NotionClient', () => {
     expect(res.id).toBe('p1');
   });
 
-  it('retrieveDataSourceがスキーマをGETする', () => {
-    const { calls } = installUrlFetch([
-      { code: 200, body: JSON.stringify({ id: 'ds-1', properties: { 'カテゴリ': { type: 'select', select: { options: [{ name: '洗剤' }] } } } }) },
-    ]);
-    const meta = NotionClient.retrieveDataSource('ds-1');
-    expect(calls[0].url).toBe('https://api.notion.com/v1/data_sources/ds-1');
-    expect(meta.properties['カテゴリ'].select?.options[0].name).toBe('洗剤');
-  });
-
   it('4xxはリトライせず即例外', () => {
     const { calls } = installUrlFetch([{ code: 404, body: 'nf' }]);
     expect(() => NotionClient.retrievePage('p1')).toThrow('Notion API error: 404');

@@ -10,7 +10,6 @@ import type { InventoryItem, LineMessage, Purchase } from '../types';
 export const textMessage = (text: string): LineMessage => ({ type: 'text', text });
 
 const MAX_ROWS = 20;
-const MAX_OPTIONS = 12;
 const COLOR_IN_STOCK = '#06C755';
 const COLOR_OUT_OF_STOCK = '#E63946';
 
@@ -37,6 +36,14 @@ const postbackButton = (label: string, data: string, displayText?: string): Flex
   style: 'secondary',
   height: 'sm',
   action: postbackAction(label, data, displayText),
+});
+
+/** 外部URL(Notionの編集ページ等)を開くボタン */
+const uriButton = (label: string, uri: string): FlexNode => ({
+  type: 'button',
+  style: 'secondary',
+  height: 'sm',
+  action: { type: 'uri', label, uri },
 });
 
 const cancelButton = (): FlexNode => postbackButton('キャンセル', 'action=cancel', 'キャンセル');
@@ -154,85 +161,12 @@ export const FlexBuilder = {
           item.inStock
             ? postbackButton('なくなった', `action=out&step=pick&id=${id}`, `なくなった: ${item.name}`)
             : postbackButton('買った', `action=buy&step=pick&id=${id}`, `買った: ${item.name}`),
-          postbackButton('編集', `action=edit&step=menu&id=${id}`),
+          uriButton('編集(Notion)', item.notionUrl), // 詳細編集はNotionページで行う(R-14)
           postbackButton('履歴', `action=history&id=${id}`),
         ],
       },
     };
     return { type: 'flex', altText: `${item.name}(${item.inStock ? '在庫あり' : '在庫切れ'})`, contents: bubble };
-  },
-
-  /** 編集メニュー(名前/購入先/写真。それ以外の編集はNotionで: R-05) */
-  buildEditMenuMessage(item: InventoryItem): LineMessage {
-    const id = encodeURIComponent(item.pageId);
-    const bubble: FlexNode = {
-      type: 'bubble',
-      body: {
-        type: 'box',
-        layout: 'vertical',
-        contents: [
-          { type: 'text', text: `${item.name} の何を変えますか?`, weight: 'bold', wrap: true },
-          { type: 'text', text: 'その他の編集はNotionで行えます。', size: 'xs', color: '#999999', margin: 'sm', wrap: true },
-        ],
-      },
-      footer: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'sm',
-        contents: [
-          postbackButton('名前を変える', `action=edit&step=field&field=name&id=${id}`),
-          postbackButton('購入先を変える', `action=edit&step=field&field=stores&id=${id}`),
-          postbackButton('写真を変える', `action=edit&step=field&field=photo&id=${id}`),
-          cancelButton(),
-        ],
-      },
-    };
-    return { type: 'flex', altText: `${item.name} の編集`, contents: bubble };
-  },
-
-  /**
-   * Select/Multi-selectの選択肢ボタン一覧(新規登録フロー用: R-13)。
-   * optionsは最大12件表示。selectedに含まれる項目は「✓ 」を付けて表示する。
-   */
-  buildOptionPickMessage(params: {
-    title: string;
-    options: string[];
-    actionBase: string;                      // 例: 'action=new&step=category'(valueはビルダーが付与)
-    selected?: string[];
-    skip?: { label: string; data: string };  // 「スキップ」等
-    done?: { label: string; data: string };  // 「決定」等(複数選択用)
-  }): LineMessage {
-    const { title, options, actionBase, selected = [], skip, done } = params;
-    const visible = options.slice(0, MAX_OPTIONS);
-    const hidden = options.length - visible.length;
-
-    const bodyContents: FlexNode[] = [
-      { type: 'text', text: title, weight: 'bold', wrap: true },
-      { type: 'text', text: '選択肢の追加・変更はNotionで行えます。', size: 'xs', color: '#999999', margin: 'sm', wrap: true },
-    ];
-    if (selected.length > 0) {
-      bodyContents.push({ type: 'text', text: `選択中: ${selected.join(' / ')}`, size: 'sm', margin: 'md', wrap: true });
-    }
-    if (hidden > 0) {
-      bodyContents.push(truncateFooter(hidden));
-    }
-
-    const buttons: FlexNode[] = visible.map((name) =>
-      postbackButton(
-        `${selected.includes(name) ? '✓ ' : ''}${name}`,
-        `${actionBase}&value=${encodeURIComponent(name)}`,
-      ),
-    );
-    if (skip) buttons.push(postbackButton(skip.label, skip.data));
-    if (done) buttons.push(postbackButton(done.label, done.data));
-    buttons.push(cancelButton());
-
-    const bubble: FlexNode = {
-      type: 'bubble',
-      body: { type: 'box', layout: 'vertical', contents: bodyContents },
-      footer: { type: 'box', layout: 'vertical', spacing: 'sm', contents: buttons },
-    };
-    return { type: 'flex', altText: title, contents: bubble };
   },
 
   /** ヘルプ(テキストで十分) */
@@ -249,7 +183,7 @@ export const FlexBuilder = {
         '・新規 品名 … 品目を登録\n' +
         '・履歴 品名 … 購入履歴を見る\n' +
         '・検索 キーワード\n' +
-        '・編集 品名 … 名前/購入先/写真を変更\n' +
+        '・編集 品名 … Notionの編集ページを開く\n' +
         '・キャンセル … 途中の操作をやめる\n\n' +
         '品目の詳しい編集はNotionで行えます。',
     };

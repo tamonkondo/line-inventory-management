@@ -18,6 +18,7 @@ describe('NotionMapper.toInventoryItem', () => {
     };
     expect(NotionMapper.toInventoryItem(page)).toEqual({
       pageId: 'page-1',
+      notionUrl: 'https://www.notion.so/page1', // urlフィールドがない場合はIDから組み立て
       name: '食器用洗剤',
       inStock: true,
       category: '洗剤',
@@ -32,6 +33,7 @@ describe('NotionMapper.toInventoryItem', () => {
     const item = NotionMapper.toInventoryItem({ id: 'empty', properties: {} });
     expect(item).toEqual({
       pageId: 'empty',
+      notionUrl: 'https://www.notion.so/empty',
       name: '',
       inStock: false,
       category: null,
@@ -40,6 +42,11 @@ describe('NotionMapper.toInventoryItem', () => {
       memo: null,
       lastPurchasedAt: null,
     });
+  });
+
+  it('APIレスポンスのurlをnotionUrlに使う', () => {
+    const page: NotionPage = { id: 'p', url: 'https://www.notion.so/My-Item-abc123', properties: {} };
+    expect(NotionMapper.toInventoryItem(page).notionUrl).toBe('https://www.notion.so/My-Item-abc123');
   });
 
   it('external形式の写真URLを読む', () => {

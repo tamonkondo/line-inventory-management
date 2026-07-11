@@ -10,7 +10,7 @@ import { PurchaseService } from '../src/services/purchaseService';
 import type { InventoryItem } from '../src/types';
 
 const item: InventoryItem = {
-  pageId: 'item-1', name: '米', inStock: false, category: null, photoUrl: null,
+  pageId: 'item-1', notionUrl: 'https://www.notion.so/item1', name: '米', inStock: false, category: null, photoUrl: null,
   stores: [], memo: null, lastPurchasedAt: null,
 };
 

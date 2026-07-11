@@ -13,7 +13,7 @@ import { NotificationService } from '../src/services/notificationService';
 import type { InventoryItem, User } from '../src/types';
 
 const item = (stores: string[] = [], photoUrl: string | null = null): InventoryItem => ({
-  pageId: 'item-1', name: 'トイレットペーパー', inStock: false, category: null, photoUrl,
+  pageId: 'item-1', notionUrl: 'https://www.notion.so/item1', name: 'トイレットペーパー', inStock: false, category: null, photoUrl,
   stores, memo: null, lastPurchasedAt: null,
 });
 

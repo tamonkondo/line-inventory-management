@@ -25,7 +25,7 @@ export const handleImageMessage = (event: LineWebhookEvent): void => {
   const session = SessionStore.get(userId);
   if (session?.flow !== 'attach_photo') {
     LineClient.reply(event.replyToken, [
-      textMessage('写真を登録するには「編集 品名」→「写真を変える」から操作してください。'),
+      textMessage('写真は品目の登録直後に送るか、Notionの品目ページで直接追加してください(「編集 品名」でページのリンクを表示できます)。'),
     ]);
     return;
   }

@@ -1,5 +1,4 @@
 import { LineClient } from '../clients/lineClient';
-import { InventoryService, isDuplicateItemError } from '../services/inventoryService';
 import { textMessage } from '../messages/flexBuilder';
 import { SessionStore } from '../utils/sessionStore';
 import { routeCommand, beginNewItemFlow } from '../router/commandRouter';
@@ -21,34 +20,6 @@ const handleSessionText = (session: SessionState, input: string, context: Comman
       return [text(`「${value}」はすでにあります。別の名前を送るか「キャンセル」してください。`)];
     }
     return messages;
-  }
-
-  if (session.flow === 'new' && (session.step === 'category' || session.step === 'stores')) {
-    // 選択ステップ中のテキストは受け付けない(セッション維持)
-    return [text('ボタンから選んでください(やめる場合は「キャンセル」)。')];
-  }
-
-  if (session.flow === 'edit' && session.step === 'name') {
-    try {
-      InventoryService.updateName(session.data.pageId, value);
-      SessionStore.clear(context.lineUserId);
-      return [text(`名前を「${value}」に変更しました。`)];
-    } catch (err) {
-      if (isDuplicateItemError(err)) {
-        return [text(`「${value}」はすでにあります。別の名前を送るか「キャンセル」してください。`)];
-      }
-      throw err;
-    }
-  }
-
-  if (session.flow === 'edit' && session.step === 'stores') {
-    const stores = value.split(/[/、,・]/).map((store) => store.trim()).filter((store) => store.length > 0);
-    if (stores.length === 0) {
-      return [text('購入先を「スーパー / Amazon」のように送ってください(やめる場合は「キャンセル」)。')];
-    }
-    InventoryService.updateStores(session.data.pageId, stores);
-    SessionStore.clear(context.lineUserId);
-    return [text(`購入先を更新しました: ${stores.join(' / ')}`)];
   }
 
   if (session.flow === 'attach_photo') {

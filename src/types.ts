@@ -2,6 +2,7 @@
 
 export interface InventoryItem {
   pageId: string;                 // NotionページID
+  notionUrl: string;              // Notionの編集ページURL(R-14)
   name: string;                   // 品名
   inStock: boolean;               // 在庫あり=true / 在庫切れ=false
   category: string | null;        // カテゴリ(Select名)
@@ -40,19 +41,9 @@ export interface LineWebhookEvent {
   postback?: { data: string };
 }
 
-/** 新規登録フローの入力途中データ */
-export interface NewItemDraft {
-  name: string;
-  category: string | null;
-  stores: string[];
-}
-
-/** 会話セッション状態 */
+/** 会話セッション状態(品目の詳細編集はNotionで行うため、LINE側は品名入力と写真待ちのみ: R-14) */
 export type SessionState =
   | { flow: 'new'; step: 'name' }
-  | { flow: 'new'; step: 'category'; data: { name: string } }
-  | { flow: 'new'; step: 'stores'; data: NewItemDraft }
-  | { flow: 'edit'; step: 'name' | 'stores'; data: { pageId: string } }
   | { flow: 'attach_photo'; step: 'wait'; data: { pageId: string } };
 
 /** ルーター/ハンドラ共通のコンテキスト */

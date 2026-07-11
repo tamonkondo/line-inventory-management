@@ -61,6 +61,8 @@ export const NotionMapper = {
     const P = NOTION_PROPS.INVENTORY;
     return {
       pageId: page.id,
+      // APIレスポンスのurlを使い、欠けていればページIDから組み立てる
+      notionUrl: page.url ?? `https://www.notion.so/${page.id.replace(/-/g, '')}`,
       name: propTitle(page, P.NAME),
       inStock: propCheckbox(page, P.IN_STOCK),
       category: propSelect(page, P.CATEGORY),

@@ -109,31 +109,4 @@ export const InventoryService = {
       }),
     });
   },
-
-  /** カテゴリ(Select)の選択肢名(Notionスキーマから。10分キャッシュ) */
-  getCategoryOptions(): string[] {
-    return getPropertyOptions(P.CATEGORY, 'select');
-  },
-
-  /** 購入先(Multi-select)の選択肢名(Notionスキーマから。10分キャッシュ) */
-  getStoreOptions(): string[] {
-    return getPropertyOptions(P.STORES, 'multi_select');
-  },
-};
-
-const OPTIONS_CACHE_TTL_SECONDS = 600; // 10分。Notion側の選択肢追加の反映はこの遅延を許容
-
-/** 在庫データソースのSelect/Multi-selectプロパティから選択肢名を取り出す(未定義・0件は空配列) */
-const getPropertyOptions = (propertyName: string, kind: 'select' | 'multi_select'): string[] => {
-  const cacheKey = `notion:options:${propertyName}`;
-  const cache = CacheService.getScriptCache();
-  const cached = cache.get(cacheKey);
-  if (cached) return JSON.parse(cached) as string[];
-
-  const meta = NotionClient.retrieveDataSource(CONFIG.NOTION_INVENTORY_DB_ID);
-  const property = meta.properties?.[propertyName];
-  const options = (kind === 'select' ? property?.select?.options : property?.multi_select?.options) ?? [];
-  const names = options.map((option) => option.name);
-  cache.put(cacheKey, JSON.stringify(names), OPTIONS_CACHE_TTL_SECONDS);
-  return names;
 };

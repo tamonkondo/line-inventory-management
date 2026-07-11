@@ -3,7 +3,7 @@ import { FlexBuilder } from '../src/messages/flexBuilder';
 import type { InventoryItem, Purchase } from '../src/types';
 
 const item = (overrides: Partial<InventoryItem> = {}): InventoryItem => ({
-  pageId: 'page-1', name: '食器用洗剤', inStock: true, category: '洗剤',
+  pageId: 'page-1', notionUrl: 'https://www.notion.so/page1', name: '食器用洗剤', inStock: true, category: '洗剤',
   photoUrl: null, stores: ['スーパー'], memo: null,
   lastPurchasedAt: '2026-07-01', ...overrides,
 });
@@ -71,7 +71,10 @@ describe('buildItemCard', () => {
     if (inStock.type !== 'flex' || outOfStock.type !== 'flex') return;
     expect(allPostbackData(inStock)).toContain('action=out&step=pick&id=page-1');
     expect(allPostbackData(outOfStock)).toContain('action=buy&step=pick&id=page-1');
-    expect(allPostbackData(inStock)).toContain('action=edit&step=menu&id=page-1');
+    const uris = flatten(inStock.contents)
+      .map((n) => n.action as FlexNode | undefined)
+      .filter((a): a is FlexNode => a?.type === 'uri');
+    expect(uris.some((a) => a.uri === 'https://www.notion.so/page1' && a.label === '編集(Notion)')).toBe(true);
     expect(allPostbackData(inStock)).toContain('action=history&id=page-1');
   });
 
@@ -104,17 +107,7 @@ describe('buildItemCard', () => {
   });
 });
 
-describe('buildEditMenuMessage / buildHelpMessage', () => {
-  it('編集メニューが3項目+キャンセルのpostbackを含む', () => {
-    const message = FlexBuilder.buildEditMenuMessage(item());
-    if (message.type !== 'flex') return;
-    const data = allPostbackData(message);
-    expect(data).toContain('action=edit&step=field&field=name&id=page-1');
-    expect(data).toContain('action=edit&step=field&field=stores&id=page-1');
-    expect(data).toContain('action=edit&step=field&field=photo&id=page-1');
-    expect(data).toContain('action=cancel');
-  });
-
+describe('buildHelpMessage ほか', () => {
   it('ヘルプはテキストメッセージ', () => {
     const message = FlexBuilder.buildHelpMessage();
     expect(message.type).toBe('text');
@@ -122,45 +115,11 @@ describe('buildEditMenuMessage / buildHelpMessage', () => {
     expect(message.text).toContain('なくなった 品名');
   });
 
-  it('buildOptionPickMessageが選択肢・選択中✓・スキップ/決定/キャンセルを含む', () => {
-    const message = FlexBuilder.buildOptionPickMessage({
-      title: '購入先を選んでください',
-      options: ['スーパー', 'Amazon'],
-      actionBase: 'action=new&step=store',
-      selected: ['Amazon'],
-      done: { label: '決定', data: 'action=new&step=storesDone' },
-    });
-    if (message.type !== 'flex') return;
-    const data = allPostbackData(message);
-    expect(data).toContain('action=new&step=store&value=%E3%82%B9%E3%83%BC%E3%83%91%E3%83%BC');
-    expect(data).toContain('action=new&step=store&value=Amazon');
-    expect(data).toContain('action=new&step=storesDone');
-    expect(data).toContain('action=cancel');
-    const labels = flatten(message.contents)
-      .map((n) => (n.action as FlexNode | undefined)?.label)
-      .filter((l): l is string => typeof l === 'string');
-    expect(labels).toContain('✓ Amazon');
-    expect(labels).toContain('スーパー');
-  });
-
-  it('buildOptionPickMessageは13件以上を12件+案内に切り詰める', () => {
-    const options = Array.from({ length: 15 }, (_, i) => `店${i}`);
-    const message = FlexBuilder.buildOptionPickMessage({
-      title: 'テスト', options, actionBase: 'action=new&step=store',
-    });
-    if (message.type !== 'flex') return;
-    const optionData = allPostbackData(message).filter((d) => d.includes('&value='));
-    expect(optionData).toHaveLength(12);
-    const texts = flatten(message.contents).map((n) => n.text).filter((t): t is string => typeof t === 'string');
-    expect(texts.some((t) => t.includes('ほか 3 件'))).toBe(true);
-  });
-
   it('全FlexメッセージにaltTextがある', () => {
     const messages = [
       FlexBuilder.buildItemListMessage('在庫一覧', [item()]),
       FlexBuilder.buildPickListMessage([item()], 'out'),
       FlexBuilder.buildItemCard(item()),
-      FlexBuilder.buildEditMenuMessage(item()),
     ];
     for (const message of messages) {
       expect(message.type).toBe('flex');

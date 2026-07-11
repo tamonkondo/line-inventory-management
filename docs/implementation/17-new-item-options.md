@@ -1,5 +1,9 @@
 # 実装書(17): 新規登録フローのカテゴリ・購入先選択(R-13)
 
+> **⚠️ 廃止(2026-07-11)**: 本書の選択フローは一度実装されたが、**R-14(詳細編集はNotionページへ直接誘導)により削除**された。
+> 新規登録は「品名入力 → 登録 → NotionページURLを案内」、編集はカードの「編集(Notion)」ボタンからNotionを直接開く方式になった。
+> 本書は経緯の記録として保持する。
+
 - **依存**: 04, 07, 10, 11, 12(実装済みコードへの追加改修)
 - **対象ファイル**: `src/clients/notionClient.ts`、`src/services/inventoryService.ts`、`src/types.ts`、`src/router/commandRouter.ts`、`src/handlers/postbackHandler.ts`、`src/handlers/messageHandler.ts`、`src/messages/flexBuilder.ts`、関連テスト
 

@@ -11,6 +11,7 @@ const NOTION_VERSION = '2026-03-11';
 
 export interface NotionPage {
   id: string;
+  url?: string; // NotionページのURL(編集画面への誘導に使う)
   properties: Record<string, NotionPropertyValue>;
 }
 
@@ -32,16 +33,6 @@ export interface NotionQueryResponse {
   results: NotionPage[];
   has_more: boolean;
   next_cursor: string | null;
-}
-
-/** GET /v1/data_sources/{id} のスキーマ(必要フィールドのみ) */
-export interface NotionDataSourceMeta {
-  id: string;
-  properties: Record<string, {
-    type?: string;
-    select?: { options: Array<{ name: string }> };
-    multi_select?: { options: Array<{ name: string }> };
-  }>;
 }
 
 const notionFetch = <T>(method: 'get' | 'post' | 'patch', path: string, payload?: object): T => {
@@ -90,11 +81,6 @@ export const NotionClient = {
 
   retrievePage(pageId: string): NotionPage {
     return notionFetch<NotionPage>('get', `/pages/${pageId}`);
-  },
-
-  /** データソースのスキーマ取得(Select/Multi-selectの選択肢の参照用) */
-  retrieveDataSource(dataSourceId: string): NotionDataSourceMeta {
-    return notionFetch<NotionDataSourceMeta>('get', `/data_sources/${dataSourceId}`);
   },
 
   /** queryDataSourceのpaginationを吸収して全ページ配列を返す(引数payloadは破壊しない) */

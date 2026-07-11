@@ -6,7 +6,7 @@ import { FlexBuilder, textMessage } from '../messages/flexBuilder';
 import { SessionStore } from '../utils/sessionStore';
 import { parseCommand } from '../utils/parse';
 import { logInfo, logError } from '../utils/logger';
-import type { CommandContext, InventoryItem, LineMessage, NewItemDraft } from '../types';
+import type { CommandContext, InventoryItem, LineMessage } from '../types';
 
 type ResolveResult =
   | { kind: 'found'; item: InventoryItem }
@@ -68,17 +68,20 @@ export const buildHistoryMessages = (item: InventoryItem): LineMessage[] => {
   return [textMessage(`${item.name} の購入履歴\n${lines}`)];
 };
 
-/** 品目を作成し、完了カード+写真案内を返す。重複は 'duplicate' */
-const createNewItemMessages = (
-  input: { name: string; category?: string; stores?: string[] },
-  context: CommandContext,
-): LineMessage[] | 'duplicate' => {
+/**
+ * 新規品目の登録(品名確定時)。作成後、詳細編集用のNotionページURLを案内する(R-14)。
+ * 重複時は 'duplicate' を返し、文言は呼び出し側が文脈に合わせて決める。
+ * messageHandler(品名入力)とhandleNew(「新規 品名」)から共用。
+ */
+export const beginNewItemFlow = (name: string, context: CommandContext): LineMessage[] | 'duplicate' => {
   try {
-    const item = InventoryService.create(input);
+    const item = InventoryService.create({ name });
     SessionStore.set(context.lineUserId, { flow: 'attach_photo', step: 'wait', data: { pageId: item.pageId } });
     return [
-      textMessage(`「${item.name}」を登録しました。`),
-      FlexBuilder.buildItemCard(item),
+      textMessage(
+        `「${item.name}」を登録しました。\n\n` +
+        `カテゴリ・購入先・メモなどの詳細はNotionで編集できます:\n${item.notionUrl}`,
+      ),
       textMessage('続けて写真を送ると登録できます(不要なら「キャンセル」)。'),
     ];
   } catch (err) {
@@ -87,57 +90,10 @@ const createNewItemMessages = (
   }
 };
 
-/**
- * 新規登録フローの開始(品名確定時)。重複チェック→カテゴリ選択へ(R-13)。
- * カテゴリの選択肢がなければ購入先選択へ、それもなければ即作成(従来挙動)。
- * messageHandler(品名入力)とhandleNew(「新規 品名」)から共用。
- */
-export const beginNewItemFlow = (name: string, context: CommandContext): LineMessage[] | 'duplicate' => {
-  if (InventoryService.findByName(name)) return 'duplicate';
-  const options = InventoryService.getCategoryOptions();
-  if (options.length === 0) {
-    return promptStoresStep({ name, category: null, stores: [] }, context);
-  }
-  SessionStore.set(context.lineUserId, { flow: 'new', step: 'category', data: { name } });
-  return [FlexBuilder.buildOptionPickMessage({
-    title: `「${name}」のカテゴリを選んでください`,
-    options,
-    actionBase: 'action=new&step=category',
-    skip: { label: 'スキップ(設定しない)', data: 'action=new&step=category&value=' },
-  })];
-};
-
-/**
- * 購入先選択ステップの提示(postbackHandlerのカテゴリ確定・選択トグルからも共用)。
- * 選択肢がなければそのまま作成へ進む。
- */
-export const promptStoresStep = (draft: NewItemDraft, context: CommandContext): LineMessage[] => {
-  const options = InventoryService.getStoreOptions();
-  if (options.length === 0) return finishNewItem(draft, context);
-  SessionStore.set(context.lineUserId, { flow: 'new', step: 'stores', data: draft });
-  return [FlexBuilder.buildOptionPickMessage({
-    title: `「${draft.name}」の購入先を選んでください(複数可)`,
-    options,
-    actionBase: 'action=new&step=store',
-    selected: draft.stores,
-    done: { label: draft.stores.length > 0 ? '決定' : '決定(設定しない)', data: 'action=new&step=storesDone' },
-  })];
-};
-
-/** 新規登録フローの確定(storesDone / 選択肢なし時)。作成して完了メッセージを返す */
-export const finishNewItem = (draft: NewItemDraft, context: CommandContext): LineMessage[] => {
-  const messages = createNewItemMessages({
-    name: draft.name,
-    ...(draft.category ? { category: draft.category } : {}),
-    ...(draft.stores.length > 0 ? { stores: draft.stores } : {}),
-  }, context);
-  if (messages === 'duplicate') {
-    // beginNewItemFlowの後に同名が作られた稀なケース
-    SessionStore.clear(context.lineUserId);
-    return [textMessage(`「${draft.name}」はすでに登録されています。`)];
-  }
-  return messages;
-};
+/** 品目のNotion編集ページへの誘導(「編集 品名」と旧カードの編集postbackで共用: R-14) */
+export const buildEditLinkMessages = (item: InventoryItem): LineMessage[] => [
+  textMessage(`「${item.name}」はNotionで編集できます(名前・カテゴリ・購入先・メモ・写真):\n${item.notionUrl}`),
+];
 
 /** 品目解決に失敗したときの共通メッセージ(候補があれば選択リストを付ける) */
 const unresolvedMessages = (arg: string, result: ResolveResult, pickAction?: 'out' | 'buy'): LineMessage[] => {
@@ -196,7 +152,7 @@ const handleEdit = (arg: string): LineMessage[] => {
   if (!arg) return [textMessage('「編集 品名」の形で送ってください。')];
   const result = resolveItem(arg);
   if (result.kind !== 'found') return unresolvedMessages(arg, result);
-  return [FlexBuilder.buildEditMenuMessage(result.item)];
+  return buildEditLinkMessages(result.item);
 };
 
 /**

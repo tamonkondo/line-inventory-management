@@ -6,7 +6,6 @@ vi.mock('../src/services/inventoryService', () => ({
     list: vi.fn(), listShortage: vi.fn(), search: vi.fn(), findByName: vi.fn(),
     getByPageId: vi.fn(), create: vi.fn(), setInStock: vi.fn(),
     updateName: vi.fn(), updateStores: vi.fn(), attachPhoto: vi.fn(),
-    getCategoryOptions: vi.fn(), getStoreOptions: vi.fn(),
   },
   isDuplicateItemError: (err: unknown) => err instanceof Error && err.message === 'DUPLICATE_ITEM',
 }));
@@ -29,18 +28,15 @@ import { routeCommand, executeOut, executeBuy } from '../src/router/commandRoute
 import type { InventoryItem } from '../src/types';
 
 const item = (overrides: Partial<InventoryItem> = {}): InventoryItem => ({
-  pageId: 'page-1', name: '米', inStock: true, category: null, photoUrl: null,
+  pageId: 'page-1', notionUrl: 'https://www.notion.so/page1', name: '米', inStock: true, category: null, photoUrl: null,
   stores: [], memo: null, lastPurchasedAt: null, ...overrides,
 });
 
 const ctx = { lineUserId: 'U1' };
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
   installCache();
-  // 選択肢なし=従来どおり即作成、が既定の前提
-  vi.mocked(InventoryService.getCategoryOptions).mockReturnValue([]);
-  vi.mocked(InventoryService.getStoreOptions).mockReturnValue([]);
 });
 
 describe('routeCommand 基本', () => {
@@ -171,44 +167,27 @@ describe('executeBuy / 買った', () => {
   });
 });
 
-describe('新規登録', () => {
-  it('選択肢なしの場合は従来どおり即作成(カード+写真案内、attach_photoセッション)', () => {
-    vi.mocked(InventoryService.create).mockReturnValue(item({ pageId: 'new-page', name: 'ラップ' }));
+describe('新規登録 (R-14)', () => {
+  it('登録するとNotionの編集URLを案内し、attach_photoセッションをセット', () => {
+    vi.mocked(InventoryService.create).mockReturnValue(item({ pageId: 'new-page', name: 'ラップ', notionUrl: 'https://www.notion.so/newpage' }));
     const messages = routeCommand('新規 ラップ', ctx);
-    expect(messages).toHaveLength(3);
+    expect(messages).toHaveLength(2);
+    expect((messages?.[0] as { text: string }).text).toContain('「ラップ」を登録しました');
+    expect((messages?.[0] as { text: string }).text).toContain('https://www.notion.so/newpage');
+    expect((messages?.[1] as { text: string }).text).toContain('写真');
     expect(SessionStore.get('U1')).toEqual({ flow: 'attach_photo', step: 'wait', data: { pageId: 'new-page' } });
   });
 
-  it('重複は品名確定時に弾かれる', () => {
-    vi.mocked(InventoryService.findByName).mockReturnValue(item({ name: '米' }));
+  it('重複はDUPLICATE_ITEMを文言に変換', () => {
+    vi.mocked(InventoryService.create).mockImplementation(() => { throw new Error('DUPLICATE_ITEM'); });
     const messages = routeCommand('新規 米', ctx);
     expect((messages?.[0] as { text: string }).text).toContain('すでに登録されています');
-    expect(InventoryService.create).not.toHaveBeenCalled();
   });
 
   it('引数なしはnameセッションをセットして品名を促す', () => {
     const messages = routeCommand('新規', ctx);
     expect((messages?.[0] as { text: string }).text).toContain('品名を送ってください');
     expect(SessionStore.get('U1')).toEqual({ flow: 'new', step: 'name' });
-  });
-
-  it('カテゴリ選択肢があれば選択メッセージを返しcategoryセッションをセット(R-13)', () => {
-    vi.mocked(InventoryService.findByName).mockReturnValue(null);
-    vi.mocked(InventoryService.getCategoryOptions).mockReturnValue(['洗剤', '食品']);
-    const messages = routeCommand('新規 ラップ', ctx);
-    expect(messages?.[0].type).toBe('flex');
-    expect(SessionStore.get('U1')).toEqual({ flow: 'new', step: 'category', data: { name: 'ラップ' } });
-    expect(InventoryService.create).not.toHaveBeenCalled();
-  });
-
-  it('カテゴリなし・購入先ありなら購入先選択へ進む', () => {
-    vi.mocked(InventoryService.findByName).mockReturnValue(null);
-    vi.mocked(InventoryService.getStoreOptions).mockReturnValue(['スーパー']);
-    const messages = routeCommand('新規 ラップ', ctx);
-    expect(messages?.[0].type).toBe('flex');
-    expect(SessionStore.get('U1')).toEqual({
-      flow: 'new', step: 'stores', data: { name: 'ラップ', category: null, stores: [] },
-    });
   });
 });
 
@@ -237,10 +216,10 @@ describe('履歴・検索・編集', () => {
     expect((routeCommand('検索 ない', ctx)?.[0] as { text: string }).text).toContain('見つかりませんでした');
   });
 
-  it('編集: 編集メニューFlexを返す', () => {
+  it('編集: Notionの編集ページURLを案内する (R-14)', () => {
     vi.mocked(InventoryService.search).mockReturnValue([item({ name: '米' })]);
     const messages = routeCommand('編集 米', ctx);
-    expect(messages?.[0].type).toBe('flex');
-    if (messages?.[0].type === 'flex') expect(messages[0].altText).toContain('編集');
+    expect((messages?.[0] as { text: string }).text).toContain('Notionで編集できます');
+    expect((messages?.[0] as { text: string }).text).toContain('https://www.notion.so/page1');
   });
 });

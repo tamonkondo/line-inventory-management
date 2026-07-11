@@ -8,7 +8,6 @@ vi.mock('../src/clients/notionClient', () => ({
     createPage: vi.fn(),
     updatePage: vi.fn(),
     retrievePage: vi.fn(),
-    retrieveDataSource: vi.fn(),
   },
 }));
 
@@ -131,34 +130,5 @@ describe('InventoryService 更新系', () => {
   it('数量ベースのメソッド(add/consume)が存在しない', () => {
     expect((InventoryService as Record<string, unknown>).add).toBeUndefined();
     expect((InventoryService as Record<string, unknown>).consume).toBeUndefined();
-  });
-});
-
-describe('InventoryService 選択肢取得 (R-13)', () => {
-  const meta = {
-    id: 'ds-1',
-    properties: {
-      'カテゴリ': { type: 'select', select: { options: [{ name: '洗剤' }, { name: '食品' }] } },
-      '購入先': { type: 'multi_select', multi_select: { options: [{ name: 'スーパー' }] } },
-    },
-  };
-
-  it('カテゴリ・購入先の選択肢名をスキーマから返す', () => {
-    vi.mocked(NotionClient.retrieveDataSource).mockReturnValue(meta);
-    expect(InventoryService.getCategoryOptions()).toEqual(['洗剤', '食品']);
-    expect(InventoryService.getStoreOptions()).toEqual(['スーパー']);
-  });
-
-  it('取得結果はキャッシュされ2回目はNotionを呼ばない', () => {
-    vi.mocked(NotionClient.retrieveDataSource).mockReturnValue(meta);
-    InventoryService.getCategoryOptions();
-    InventoryService.getCategoryOptions();
-    expect(NotionClient.retrieveDataSource).toHaveBeenCalledTimes(1);
-  });
-
-  it('プロパティ未定義・選択肢なしは空配列(例外にしない)', () => {
-    vi.mocked(NotionClient.retrieveDataSource).mockReturnValue({ id: 'ds-1', properties: {} });
-    expect(InventoryService.getCategoryOptions()).toEqual([]);
-    expect(InventoryService.getStoreOptions()).toEqual([]);
   });
 });
