@@ -61,23 +61,33 @@ describe('NotificationService.notifyOutOfStock', () => {
     expect(console.error).toHaveBeenCalled();
   });
 
-  it('写真(https)があれば画像メッセージを添えて2通で送る(R-12)', () => {
+  it('写真(https)があれば本文と別便で画像を送る(R-12)', () => {
     vi.mocked(UserService.listActive).mockReturnValue([user('U2')]);
     NotificationService.notifyOutOfStock(item([], 'https://img/photo.jpg'), 'U1');
-    const [, messages] = vi.mocked(LineClient.multicast).mock.calls[0];
-    expect(messages).toHaveLength(2);
-    expect(messages[1]).toEqual({
+    const calls = vi.mocked(LineClient.multicast).mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(calls[0][1][0].type).toBe('text');
+    expect(calls[1][1][0]).toEqual({
       type: 'image',
       originalContentUrl: 'https://img/photo.jpg',
       previewImageUrl: 'https://img/photo.jpg',
     });
   });
 
-  it('https以外の写真URLは添付しない', () => {
+  it('https以外の写真URLは添付しない(本文のみ1便)', () => {
     vi.mocked(UserService.listActive).mockReturnValue([user('U2')]);
     NotificationService.notifyOutOfStock(item([], 'http://insecure/photo.jpg'), 'U1');
-    const [, messages] = vi.mocked(LineClient.multicast).mock.calls[0];
-    expect(messages).toHaveLength(1);
+    expect(LineClient.multicast).toHaveBeenCalledTimes(1);
+  });
+
+  it('写真の送信失敗は本文の配信に影響しない(ベストエフォート)', () => {
+    vi.mocked(UserService.listActive).mockReturnValue([user('U2')]);
+    vi.mocked(LineClient.multicast)
+      .mockImplementationOnce(() => undefined) // 本文: 成功
+      .mockImplementationOnce(() => { throw new Error('LINE API error: 400'); }); // 写真: 失敗
+    expect(() => NotificationService.notifyOutOfStock(item([], 'https://img/photo.jpg'), 'U1')).not.toThrow();
+    expect(LineClient.multicast).toHaveBeenCalledTimes(2);
+    expect(console.error).toHaveBeenCalled();
   });
 
   it('送信時に対象者数がログに残る(可観測性)', () => {
@@ -89,13 +99,13 @@ describe('NotificationService.notifyOutOfStock', () => {
 });
 
 describe('NotificationService.notifyRestocked (R-11)', () => {
-  it('報告者を除く有効ユーザーへ補充通知を送る(写真付き)', () => {
+  it('報告者を除く有効ユーザーへ補充通知を送る(写真は別便)', () => {
     vi.mocked(UserService.listActive).mockReturnValue([user('U1'), user('U2')]);
     NotificationService.notifyRestocked(item([], 'https://img/photo.jpg'), 'U1');
-    const [targets, messages] = vi.mocked(LineClient.multicast).mock.calls[0];
-    expect(targets).toEqual(['U2']);
-    expect((messages[0] as { text: string }).text).toContain('【補充】トイレットペーパー');
-    expect(messages[1].type).toBe('image');
+    const calls = vi.mocked(LineClient.multicast).mock.calls;
+    expect(calls[0][0]).toEqual(['U2']);
+    expect((calls[0][1][0] as { text: string }).text).toContain('【補充】トイレットペーパー');
+    expect(calls[1][1][0].type).toBe('image');
   });
 
   it('対象0人(報告者のみ)ならmulticastしない', () => {
