@@ -43,6 +43,7 @@ export const executeOut = (item: InventoryItem, context: CommandContext): LineMe
 export const executeBuy = (item: InventoryItem, context: CommandContext): LineMessage[] => {
   const wasInStock = item.inStock;
   if (!wasInStock) InventoryService.setInStock(item.pageId, true); // すでに在庫ありならno-op PATCHを省く
+  NotificationService.notifyRestocked({ ...item, inStock: true }, context.lineUserId); // R-11
 
   const userPageId = UserService.findByLineUserId(context.lineUserId)?.pageId ?? null;
   try {

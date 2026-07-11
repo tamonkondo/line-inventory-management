@@ -13,7 +13,7 @@ vi.mock('../src/services/purchaseService', () => ({
   PurchaseService: { record: vi.fn(), listRecent: vi.fn() },
 }));
 vi.mock('../src/services/notificationService', () => ({
-  NotificationService: { notifyOutOfStock: vi.fn() },
+  NotificationService: { notifyOutOfStock: vi.fn(), notifyRestocked: vi.fn() },
 }));
 vi.mock('../src/services/userService', () => ({
   UserService: { findByLineUserId: vi.fn() },
@@ -125,13 +125,16 @@ describe('executeOut / なくなった', () => {
 });
 
 describe('executeBuy / 買った', () => {
-  it('在庫切れをONに戻し購入を記録する(記録者付き)', () => {
+  it('在庫切れをONに戻し、補充通知を送り、購入を記録する(記録者付き)', () => {
     vi.mocked(UserService.findByLineUserId).mockReturnValue({
       pageId: 'user-page', name: '太郎', lineUserId: 'U1', active: true,
     });
     const target = item({ inStock: false });
     const messages = executeBuy(target, ctx);
     expect(InventoryService.setInStock).toHaveBeenCalledWith('page-1', true);
+    expect(NotificationService.notifyRestocked).toHaveBeenCalledWith(
+      expect.objectContaining({ pageId: 'page-1', inStock: true }), 'U1',
+    );
     expect(PurchaseService.record).toHaveBeenCalledWith(target, 'user-page');
     expect((messages[0] as { text: string }).text).toContain('購入履歴に記録しました');
   });

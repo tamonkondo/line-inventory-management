@@ -28,6 +28,7 @@ export interface Purchase {
 /** LINEへ返すメッセージ(必要最小限の自前型) */
 export type LineMessage =
   | { type: 'text'; text: string }
+  | { type: 'image'; originalContentUrl: string; previewImageUrl: string }
   | { type: 'flex'; altText: string; contents: Record<string, unknown> };
 
 /** LINE Webhookイベント(必要フィールドのみの自前型) */

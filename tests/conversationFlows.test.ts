@@ -16,7 +16,7 @@ vi.mock('../src/services/purchaseService', () => ({
   PurchaseService: { record: vi.fn(), listRecent: vi.fn() },
 }));
 vi.mock('../src/services/notificationService', () => ({
-  NotificationService: { notifyOutOfStock: vi.fn() },
+  NotificationService: { notifyOutOfStock: vi.fn(), notifyRestocked: vi.fn() },
 }));
 vi.mock('../src/services/userService', () => ({
   UserService: { findByLineUserId: vi.fn() },
