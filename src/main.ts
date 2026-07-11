@@ -9,6 +9,9 @@ import type { LineWebhookEvent } from './types';
 export const doPost = (e: GoogleAppsScript.Events.DoPost): GoogleAppsScript.Content.TextOutput => {
   try {
     if (!verifySignature(e)) {
+      // 迷子調査ができるよう、拒否も必ずログに残す(本文は先頭のみ・機微情報を出しすぎない)
+      const head = e?.postData?.contents ? e.postData.contents.slice(0, 200) : '(no postData)';
+      logInfo('doPost', `rejected: invalid webhook body: ${head}`);
       return ContentService.createTextOutput('invalid signature');
     }
     const body = JSON.parse(e.postData.contents) as { events?: LineWebhookEvent[] };
