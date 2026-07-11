@@ -1,6 +1,6 @@
 export type CommandName =
   | 'list' | 'shortage' | 'out' | 'buy' | 'new'
-  | 'history' | 'search' | 'edit' | 'help';
+  | 'history' | 'search' | 'edit' | 'help' | 'whoami';
 
 export interface ParsedCommand {
   command: CommandName;
@@ -18,6 +18,8 @@ const COMMAND_ALIASES: Record<string, CommandName> = {
   '検索': 'search',
   '編集': 'edit', '変更': 'edit',
   'ヘルプ': 'help', 'help': 'help', '使い方': 'help',
+  // セットアップ・デバッグ用(ヘルプには載せない): 自分のLINE User IDを確認する
+  'ID': 'whoami', 'id': 'whoami', 'myid': 'whoami', 'ユーザーID': 'whoami',
 };
 
 /** 「なくなった 食器用洗剤」等をコマンドと引数に分解する。コマンドでなければnull */

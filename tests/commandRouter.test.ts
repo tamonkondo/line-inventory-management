@@ -62,6 +62,13 @@ describe('routeCommand 基本', () => {
   it('ヘルプを返す', () => {
     expect((routeCommand('ヘルプ', ctx)?.[0] as { text: string }).text).toContain('使い方');
   });
+
+  it('「ID」で自分のLINE User IDを返し、ログにも残す', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const messages = routeCommand('ID', ctx);
+    expect((messages?.[0] as { text: string }).text).toContain('U1');
+    expect(logSpy.mock.calls.some((call) => String(call[0]).includes('lineUserId=U1'))).toBe(true);
+  });
 });
 
 describe('executeOut / なくなった', () => {

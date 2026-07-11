@@ -5,7 +5,7 @@ import { UserService } from '../services/userService';
 import { FlexBuilder, textMessage } from '../messages/flexBuilder';
 import { SessionStore } from '../utils/sessionStore';
 import { parseCommand } from '../utils/parse';
-import { logError } from '../utils/logger';
+import { logInfo, logError } from '../utils/logger';
 import type { CommandContext, InventoryItem, LineMessage } from '../types';
 
 type ResolveResult =
@@ -184,5 +184,9 @@ export const routeCommand = (input: string, context: CommandContext): LineMessag
       return handleEdit(parsed.arg);
     case 'help':
       return [FlexBuilder.buildHelpMessage()];
+    case 'whoami':
+      // 返信が届かない環境でもGASの実行ログから拾えるよう、ログにも残す
+      logInfo('whoami', `lineUserId=${context.lineUserId}`);
+      return [textMessage(`あなたのLINE User IDはこちらです(NotionのユーザーDBの「LINE User ID」列に貼り付けてください):\n\n${context.lineUserId}`)];
   }
 };

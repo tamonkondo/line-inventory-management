@@ -22,6 +22,12 @@ describe('parseCommand', () => {
     expect(parseCommand('使い方')?.command).toBe('help');
   });
 
+  it('ID確認コマンド(whoami)を解決する', () => {
+    expect(parseCommand('ID')?.command).toBe('whoami');
+    expect(parseCommand('id')?.command).toBe('whoami');
+    expect(parseCommand('ユーザーID')?.command).toBe('whoami');
+  });
+
   it('コマンドでないテキストはnull', () => {
     expect(parseCommand('こんにちは')).toBeNull();
     expect(parseCommand('')).toBeNull();
