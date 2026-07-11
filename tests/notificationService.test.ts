@@ -20,7 +20,8 @@ const item = (stores: string[] = [], photoUrl: string | null = null): InventoryI
 const user = (lineUserId: string): User => ({ pageId: `p-${lineUserId}`, name: lineUserId, lineUserId, active: true });
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  // mockImplementationのテスト間リークを防ぐためresetを使う(clearは実装を残す)
+  vi.resetAllMocks();
   vi.spyOn(console, 'log').mockImplementation(() => undefined);
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
 });
