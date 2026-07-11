@@ -5,6 +5,7 @@
  */
 import { doGet, doPost } from './main';
 import { setupRichMenu, listRichMenus, deleteAllRichMenus } from './setup/richMenuSetup';
+import { debugPing } from './setup/debugPing';
 
 declare const global: Record<string, unknown>;
 
@@ -13,6 +14,7 @@ global.doPost = doPost;
 global.doGet = doGet;
 
 // セットアップ用(GASエディタから手動実行)
+global.debugPing = debugPing;
 global.setupRichMenu = setupRichMenu;
 global.listRichMenus = listRichMenus;
 global.deleteAllRichMenus = deleteAllRichMenus;
