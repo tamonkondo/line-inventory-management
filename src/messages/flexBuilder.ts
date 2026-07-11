@@ -10,6 +10,7 @@ import type { InventoryItem, LineMessage, Purchase } from '../types';
 export const textMessage = (text: string): LineMessage => ({ type: 'text', text });
 
 const MAX_ROWS = 20;
+const MAX_OPTIONS = 12;
 const COLOR_IN_STOCK = '#06C755';
 const COLOR_OUT_OF_STOCK = '#E63946';
 
@@ -187,6 +188,51 @@ export const FlexBuilder = {
       },
     };
     return { type: 'flex', altText: `${item.name} の編集`, contents: bubble };
+  },
+
+  /**
+   * Select/Multi-selectの選択肢ボタン一覧(新規登録フロー用: R-13)。
+   * optionsは最大12件表示。selectedに含まれる項目は「✓ 」を付けて表示する。
+   */
+  buildOptionPickMessage(params: {
+    title: string;
+    options: string[];
+    actionBase: string;                      // 例: 'action=new&step=category'(valueはビルダーが付与)
+    selected?: string[];
+    skip?: { label: string; data: string };  // 「スキップ」等
+    done?: { label: string; data: string };  // 「決定」等(複数選択用)
+  }): LineMessage {
+    const { title, options, actionBase, selected = [], skip, done } = params;
+    const visible = options.slice(0, MAX_OPTIONS);
+    const hidden = options.length - visible.length;
+
+    const bodyContents: FlexNode[] = [
+      { type: 'text', text: title, weight: 'bold', wrap: true },
+      { type: 'text', text: '選択肢の追加・変更はNotionで行えます。', size: 'xs', color: '#999999', margin: 'sm', wrap: true },
+    ];
+    if (selected.length > 0) {
+      bodyContents.push({ type: 'text', text: `選択中: ${selected.join(' / ')}`, size: 'sm', margin: 'md', wrap: true });
+    }
+    if (hidden > 0) {
+      bodyContents.push(truncateFooter(hidden));
+    }
+
+    const buttons: FlexNode[] = visible.map((name) =>
+      postbackButton(
+        `${selected.includes(name) ? '✓ ' : ''}${name}`,
+        `${actionBase}&value=${encodeURIComponent(name)}`,
+      ),
+    );
+    if (skip) buttons.push(postbackButton(skip.label, skip.data));
+    if (done) buttons.push(postbackButton(done.label, done.data));
+    buttons.push(cancelButton());
+
+    const bubble: FlexNode = {
+      type: 'bubble',
+      body: { type: 'box', layout: 'vertical', contents: bodyContents },
+      footer: { type: 'box', layout: 'vertical', spacing: 'sm', contents: buttons },
+    };
+    return { type: 'flex', altText: title, contents: bubble };
   },
 
   /** ヘルプ(テキストで十分) */

@@ -40,9 +40,18 @@ export interface LineWebhookEvent {
   postback?: { data: string };
 }
 
+/** 新規登録フローの入力途中データ */
+export interface NewItemDraft {
+  name: string;
+  category: string | null;
+  stores: string[];
+}
+
 /** 会話セッション状態 */
 export type SessionState =
   | { flow: 'new'; step: 'name' }
+  | { flow: 'new'; step: 'category'; data: { name: string } }
+  | { flow: 'new'; step: 'stores'; data: NewItemDraft }
   | { flow: 'edit'; step: 'name' | 'stores'; data: { pageId: string } }
   | { flow: 'attach_photo'; step: 'wait'; data: { pageId: string } };
 

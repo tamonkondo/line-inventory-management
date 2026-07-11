@@ -63,10 +63,10 @@ export type SessionState =
 【カテゴリ選択】選択肢ボタン(最大12)+「スキップ」+「キャンセル」
   ↓ タップ: action=new&step=category&value=<name> / スキップ: action=new&step=category&value=
   ↓ session = {flow:'new', step:'stores', data:{name, category, stores: []}}
-【購入先選択】選択肢ボタン+「決定」+「スキップ」+「キャンセル」 ※複数選択
+【購入先選択】選択肢ボタン+「決定」+「キャンセル」 ※複数選択
   ↓ タップ: action=new&step=store&value=<name> → data.storesにトグル(追加/削除)して
   │         「選択中: A / B」を含む同じ選択メッセージを再提示
-  ↓ 決定: action=new&step=storesDone / スキップ: stores=[] で同じ
+  ↓ 決定: action=new&step=storesDone(未選択のまま決定=スキップ相当。ボタンラベルは「決定(設定しない)」)
   ↓ InventoryService.create({ name, category?, stores? })
 登録完了: 品目カード+「写真を送ると登録できます」
   ↓ session = {flow:'attach_photo', step:'wait', data:{pageId}}(既存フロー)

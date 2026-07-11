@@ -122,6 +122,39 @@ describe('buildEditMenuMessage / buildHelpMessage', () => {
     expect(message.text).toContain('なくなった 品名');
   });
 
+  it('buildOptionPickMessageが選択肢・選択中✓・スキップ/決定/キャンセルを含む', () => {
+    const message = FlexBuilder.buildOptionPickMessage({
+      title: '購入先を選んでください',
+      options: ['スーパー', 'Amazon'],
+      actionBase: 'action=new&step=store',
+      selected: ['Amazon'],
+      done: { label: '決定', data: 'action=new&step=storesDone' },
+    });
+    if (message.type !== 'flex') return;
+    const data = allPostbackData(message);
+    expect(data).toContain('action=new&step=store&value=%E3%82%B9%E3%83%BC%E3%83%91%E3%83%BC');
+    expect(data).toContain('action=new&step=store&value=Amazon');
+    expect(data).toContain('action=new&step=storesDone');
+    expect(data).toContain('action=cancel');
+    const labels = flatten(message.contents)
+      .map((n) => (n.action as FlexNode | undefined)?.label)
+      .filter((l): l is string => typeof l === 'string');
+    expect(labels).toContain('✓ Amazon');
+    expect(labels).toContain('スーパー');
+  });
+
+  it('buildOptionPickMessageは13件以上を12件+案内に切り詰める', () => {
+    const options = Array.from({ length: 15 }, (_, i) => `店${i}`);
+    const message = FlexBuilder.buildOptionPickMessage({
+      title: 'テスト', options, actionBase: 'action=new&step=store',
+    });
+    if (message.type !== 'flex') return;
+    const optionData = allPostbackData(message).filter((d) => d.includes('&value='));
+    expect(optionData).toHaveLength(12);
+    const texts = flatten(message.contents).map((n) => n.text).filter((t): t is string => typeof t === 'string');
+    expect(texts.some((t) => t.includes('ほか 3 件'))).toBe(true);
+  });
+
   it('全FlexメッセージにaltTextがある', () => {
     const messages = [
       FlexBuilder.buildItemListMessage('在庫一覧', [item()]),

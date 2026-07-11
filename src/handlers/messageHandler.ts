@@ -2,7 +2,7 @@ import { LineClient } from '../clients/lineClient';
 import { InventoryService, isDuplicateItemError } from '../services/inventoryService';
 import { textMessage } from '../messages/flexBuilder';
 import { SessionStore } from '../utils/sessionStore';
-import { routeCommand, createNewItemMessages } from '../router/commandRouter';
+import { routeCommand, beginNewItemFlow } from '../router/commandRouter';
 import { handleImageMessage } from './imageHandler';
 import type { CommandContext, LineMessage, LineWebhookEvent, SessionState } from '../types';
 
@@ -15,12 +15,17 @@ const handleSessionText = (session: SessionState, input: string, context: Comman
   const value = input.trim();
 
   if (session.flow === 'new' && session.step === 'name') {
-    const messages = createNewItemMessages(value, context);
+    const messages = beginNewItemFlow(value, context);
     if (messages === 'duplicate') {
       // セッション維持: 別の名前で再入力できる
       return [text(`「${value}」はすでにあります。別の名前を送るか「キャンセル」してください。`)];
     }
     return messages;
+  }
+
+  if (session.flow === 'new' && (session.step === 'category' || session.step === 'stores')) {
+    // 選択ステップ中のテキストは受け付けない(セッション維持)
+    return [text('ボタンから選んでください(やめる場合は「キャンセル」)。')];
   }
 
   if (session.flow === 'edit' && session.step === 'name') {

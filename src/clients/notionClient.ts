@@ -34,6 +34,16 @@ export interface NotionQueryResponse {
   next_cursor: string | null;
 }
 
+/** GET /v1/data_sources/{id} のスキーマ(必要フィールドのみ) */
+export interface NotionDataSourceMeta {
+  id: string;
+  properties: Record<string, {
+    type?: string;
+    select?: { options: Array<{ name: string }> };
+    multi_select?: { options: Array<{ name: string }> };
+  }>;
+}
+
 const notionFetch = <T>(method: 'get' | 'post' | 'patch', path: string, payload?: object): T => {
   const options: GoogleAppsScript.URL_Fetch.URLFetchRequestOptions = {
     method,
@@ -80,6 +90,11 @@ export const NotionClient = {
 
   retrievePage(pageId: string): NotionPage {
     return notionFetch<NotionPage>('get', `/pages/${pageId}`);
+  },
+
+  /** データソースのスキーマ取得(Select/Multi-selectの選択肢の参照用) */
+  retrieveDataSource(dataSourceId: string): NotionDataSourceMeta {
+    return notionFetch<NotionDataSourceMeta>('get', `/data_sources/${dataSourceId}`);
   },
 
   /** queryDataSourceのpaginationを吸収して全ページ配列を返す(引数payloadは破壊しない) */
