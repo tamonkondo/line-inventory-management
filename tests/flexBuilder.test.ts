@@ -40,6 +40,30 @@ describe('buildItemListMessage', () => {
     expect(allPostbackData(message)).toHaveLength(20);
   });
 
+  it('カテゴリごとに見出しを付けて表示し、未設定は最後の枠にまとめる', () => {
+    const items = [
+      item({ pageId: 'a', name: '洗剤A', category: '洗剤' }),
+      item({ pageId: 'b', name: '洗剤B', category: '洗剤' }),
+      item({ pageId: 'c', name: '米', category: '食品' }),
+      item({ pageId: 'd', name: '謎の品', category: null }),
+    ];
+    const message = FlexBuilder.buildItemListMessage('在庫一覧', items);
+    if (message.type !== 'flex') return;
+    const texts = flatten(message.contents).map((n) => n.text).filter((t): t is string => typeof t === 'string');
+    const headers = texts.filter((t) => t.startsWith('📁 '));
+    expect(headers).toEqual(['📁 洗剤', '📁 食品', '📁 未設定']); // 未設定が最後
+    // 品目行も全件含まれる
+    expect(texts).toContain('洗剤A');
+    expect(texts).toContain('謎の品');
+  });
+
+  it('全品目がカテゴリ設定済みなら未設定の枠は出ない', () => {
+    const message = FlexBuilder.buildItemListMessage('在庫一覧', [item({ category: '洗剤' })]);
+    if (message.type !== 'flex') return;
+    const texts = flatten(message.contents).map((n) => n.text).filter((t): t is string => typeof t === 'string');
+    expect(texts).not.toContain('📁 未設定');
+  });
+
   it('nullだらけの品目でも例外にならない', () => {
     const bare = item({ name: '', category: null, stores: [], photoUrl: null, lastPurchasedAt: null });
     expect(() => FlexBuilder.buildItemListMessage('在庫一覧', [bare])).not.toThrow();

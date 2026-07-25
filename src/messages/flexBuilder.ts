@@ -91,12 +91,57 @@ const listBubble = (title: string, items: InventoryItem[], rowAction: (item: Inv
   };
 };
 
+/** カテゴリ未設定の品目をまとめる枠の名前 */
+const UNSET_CATEGORY = '未設定';
+
+/** カテゴリのセクション見出し行 */
+const categoryHeaderRow = (name: string, first: boolean): FlexNode => ({
+  type: 'box',
+  layout: 'vertical',
+  margin: first ? 'none' : 'lg',
+  contents: [
+    { type: 'text', text: `📁 ${name}`, size: 'sm', weight: 'bold', color: '#555555' },
+    { type: 'separator', margin: 'sm' },
+  ],
+});
+
+/** 品目をカテゴリごとにまとめる。並びは入力順(Notionのカテゴリ順)を保ち、未設定は最後 */
+const groupByCategory = (items: InventoryItem[]): Array<[string, InventoryItem[]]> => {
+  const groups = new Map<string, InventoryItem[]>();
+  for (const item of items) {
+    const key = item.category ?? UNSET_CATEGORY;
+    const group = groups.get(key);
+    if (group) group.push(item);
+    else groups.set(key, [item]);
+  }
+  const entries = [...groups.entries()].filter(([name]) => name !== UNSET_CATEGORY);
+  const unset = groups.get(UNSET_CATEGORY);
+  if (unset) entries.push([UNSET_CATEGORY, unset]);
+  return entries;
+};
+
 export const FlexBuilder = {
-  /** 一覧(在庫一覧/不足一覧/検索結果)。行タップで品目詳細へ */
+  /** 一覧(在庫一覧/不足一覧/検索結果)。カテゴリごとに見出しを付けて表示し、行タップで品目詳細へ */
   buildItemListMessage(title: string, items: InventoryItem[]): LineMessage {
-    const bubble = listBubble(title, items, (item) =>
-      postbackAction(item.name, `action=detail&id=${encodeURIComponent(item.pageId)}`),
-    );
+    const rows: FlexNode[] = [];
+    let shownCount = 0;
+    for (const [category, groupItems] of groupByCategory(items)) {
+      if (shownCount >= MAX_ROWS) break;
+      rows.push(categoryHeaderRow(category, rows.length === 0));
+      for (const item of groupItems) {
+        if (shownCount >= MAX_ROWS) break;
+        rows.push(itemRow(item, postbackAction(item.name, `action=detail&id=${encodeURIComponent(item.pageId)}`)));
+        shownCount += 1;
+      }
+    }
+    const hidden = items.length - shownCount;
+    if (hidden > 0) rows.push(truncateFooter(hidden));
+
+    const bubble: FlexNode = {
+      type: 'bubble',
+      header: headerBox(`${title}(${items.length}件)`),
+      body: { type: 'box', layout: 'vertical', spacing: 'none', contents: rows },
+    };
     return { type: 'flex', altText: `${title}(${items.length}件)`, contents: bubble };
   },
 
