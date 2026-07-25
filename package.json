@@ -10,7 +10,7 @@
     "build": "node esbuild.mjs && cp appsscript.json dist/",
     "push": "npm run build && node -e \"const c=require('./.clasp.json');if(c.rootDir!=='dist'){console.error('.clasp.json の rootDir は \\\"dist\\\" にしてください(docs/implementation/15 参照)');process.exit(1)}\" && clasp push",
     "pull": "clasp pull",
-    "deploy": "clasp deploy"
+    "deploy": "npm run push && node scripts/deploy.mjs"
   },
   "devDependencies": {
     "@google/clasp": "^3.0.0",

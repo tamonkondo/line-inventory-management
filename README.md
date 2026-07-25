@@ -28,7 +28,10 @@ LINE Messaging API と Notion API を Google Apps Script(GAS)から連携し、�
 | `npm run typecheck` | TypeScriptの型チェック(tsc --noEmit) |
 | `npm test` | ユニットテスト(vitest) |
 | `npm run build` | esbuildで `dist/main.js` を生成し `appsscript.json` をコピー |
-| `npm run push` | ビルド+`.clasp.json` 検証+clasp push |
+| `npm run push` | ビルド+`.clasp.json` 検証+clasp push(**本番デプロイは更新されない**) |
+| `npm run deploy` | **push+本番デプロイの新バージョン発行**(URL不変)。`.env` の `GAS_DEPLOYMENT_ID` が必要 |
+
+コード更新後の反映は `git pull && npm run deploy` の2コマンドで完了します。
 
 ## ドキュメント
 
